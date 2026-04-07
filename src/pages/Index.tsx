@@ -94,6 +94,7 @@ const Index = () => {
         </AnimatePresence>
       </main>
     </div>
+    </PasscodeGate>
   );
 };
 
