@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Wallet, BarChart3 } from 'lucide-react';
 import { WeeklyView } from '@/components/WeeklyView';
 import { MonthlyOverview } from '@/components/MonthlyOverview';
+import { PasscodeGate } from '@/components/PasscodeGate';
 import { BudgetData } from '@/lib/budget-types';
 import { getAll } from '@/lib/budget-store';
 
