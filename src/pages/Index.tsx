@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Wallet, BarChart3 } from 'lucide-react';
 import { WeeklyView } from '@/components/WeeklyView';
 import { MonthlyOverview } from '@/components/MonthlyOverview';
+import { PasscodeGate } from '@/components/PasscodeGate';
 import { BudgetData } from '@/lib/budget-types';
 import { getAll } from '@/lib/budget-store';
 
@@ -17,6 +18,7 @@ const Index = () => {
   };
 
   return (
+    <PasscodeGate>
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-50">
@@ -92,6 +94,7 @@ const Index = () => {
         </AnimatePresence>
       </main>
     </div>
+    </PasscodeGate>
   );
 };
 
