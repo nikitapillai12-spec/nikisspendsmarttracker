@@ -1,4 +1,4 @@
-export const CATEGORIES = [
+export const DEFAULT_CATEGORIES = [
   'Groceries',
   'Eating Out',
   'Coffee',
@@ -9,26 +9,35 @@ export const CATEGORIES = [
   'Health & Wellness',
   'Subscriptions',
   'Utilities',
+  'Rent',
+  'Flights',
+  'Travel Spend',
+  'Insurance',
   'Other',
 ] as const;
 
-export type Category = typeof CATEGORIES[number];
+export type DefaultCategory = typeof DEFAULT_CATEGORIES[number];
+export type Category = string;
 
-export const CATEGORY_COLORS: Record<Category, string> = {
-  'Groceries': 'hsl(145, 65%, 42%)',
-  'Eating Out': 'hsl(25, 95%, 55%)',
-  'Coffee': 'hsl(30, 60%, 40%)',
-  'Transport': 'hsl(210, 80%, 55%)',
-  'Home Improvement': 'hsl(280, 55%, 55%)',
-  'Toiletries': 'hsl(330, 65%, 58%)',
-  'Gifts': 'hsl(350, 80%, 60%)',
-  'Health & Wellness': 'hsl(170, 70%, 45%)',
-  'Subscriptions': 'hsl(250, 65%, 58%)',
-  'Utilities': 'hsl(45, 85%, 50%)',
-  'Other': 'hsl(230, 10%, 55%)',
+export const DEFAULT_CATEGORY_COLORS: Record<DefaultCategory, string> = {
+  'Groceries': 'hsl(145, 65%, 50%)',
+  'Eating Out': 'hsl(25, 95%, 58%)',
+  'Coffee': 'hsl(30, 70%, 45%)',
+  'Transport': 'hsl(210, 80%, 58%)',
+  'Home Improvement': 'hsl(280, 60%, 60%)',
+  'Toiletries': 'hsl(330, 70%, 62%)',
+  'Gifts': 'hsl(350, 85%, 62%)',
+  'Health & Wellness': 'hsl(170, 75%, 48%)',
+  'Subscriptions': 'hsl(250, 70%, 62%)',
+  'Utilities': 'hsl(45, 90%, 52%)',
+  'Rent': 'hsl(200, 75%, 52%)',
+  'Flights': 'hsl(290, 70%, 58%)',
+  'Travel Spend': 'hsl(180, 70%, 48%)',
+  'Insurance': 'hsl(15, 80%, 55%)',
+  'Other': 'hsl(230, 15%, 58%)',
 };
 
-export const CATEGORY_EMOJI: Record<Category, string> = {
+export const DEFAULT_CATEGORY_EMOJI: Record<DefaultCategory, string> = {
   'Groceries': '🛒',
   'Eating Out': '🍽️',
   'Coffee': '☕',
@@ -39,8 +48,18 @@ export const CATEGORY_EMOJI: Record<Category, string> = {
   'Health & Wellness': '💪',
   'Subscriptions': '📱',
   'Utilities': '💡',
+  'Rent': '🏡',
+  'Flights': '✈️',
+  'Travel Spend': '🧳',
+  'Insurance': '🛡️',
   'Other': '📦',
 };
+
+export interface CustomCategory {
+  name: string;
+  emoji: string;
+  color: string;
+}
 
 export interface SpendEntry {
   id: string;
@@ -58,4 +77,26 @@ export interface MonthlyBudget {
 export interface BudgetData {
   entries: SpendEntry[];
   monthlyBudgets: MonthlyBudget[];
+  customCategories: CustomCategory[];
+}
+
+// Helper to get all categories (default + custom)
+export function getAllCategories(customCategories: CustomCategory[]): string[] {
+  return [...DEFAULT_CATEGORIES, ...customCategories.map(c => c.name)];
+}
+
+export function getCategoryColor(category: string, customCategories: CustomCategory[]): string {
+  if (category in DEFAULT_CATEGORY_COLORS) {
+    return DEFAULT_CATEGORY_COLORS[category as DefaultCategory];
+  }
+  const custom = customCategories.find(c => c.name === category);
+  return custom?.color || 'hsl(230, 15%, 58%)';
+}
+
+export function getCategoryEmoji(category: string, customCategories: CustomCategory[]): string {
+  if (category in DEFAULT_CATEGORY_EMOJI) {
+    return DEFAULT_CATEGORY_EMOJI[category as DefaultCategory];
+  }
+  const custom = customCategories.find(c => c.name === category);
+  return custom?.emoji || '🏷️';
 }

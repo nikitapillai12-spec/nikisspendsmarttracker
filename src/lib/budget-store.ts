@@ -1,13 +1,18 @@
-import { BudgetData, SpendEntry, MonthlyBudget } from './budget-types';
+import { BudgetData, SpendEntry, MonthlyBudget, CustomCategory } from './budget-types';
 
 const STORAGE_KEY = 'budget-tracker-data';
 
 function load(): BudgetData {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      // Migration: ensure customCategories exists
+      if (!parsed.customCategories) parsed.customCategories = [];
+      return parsed;
+    }
   } catch {}
-  return { entries: [], monthlyBudgets: [] };
+  return { entries: [], monthlyBudgets: [], customCategories: [] };
 }
 
 function save(data: BudgetData) {
@@ -63,4 +68,29 @@ export function getEntriesForDate(date: string): SpendEntry[] {
 
 export function getEntriesForWeek(weekStart: string, weekEnd: string): SpendEntry[] {
   return load().entries.filter(e => e.date >= weekStart && e.date <= weekEnd);
+}
+
+export function addCustomCategory(cat: CustomCategory): BudgetData {
+  const data = load();
+  data.customCategories.push(cat);
+  save(data);
+  return data;
+}
+
+export function updateCustomCategory(oldName: string, cat: CustomCategory): BudgetData {
+  const data = load();
+  data.customCategories = data.customCategories.map(c => c.name === oldName ? cat : c);
+  // Also update entries that used the old name
+  if (oldName !== cat.name) {
+    data.entries = data.entries.map(e => e.category === oldName ? { ...e, category: cat.name } : e);
+  }
+  save(data);
+  return data;
+}
+
+export function deleteCustomCategory(name: string): BudgetData {
+  const data = load();
+  data.customCategories = data.customCategories.filter(c => c.name !== name);
+  save(data);
+  return data;
 }
