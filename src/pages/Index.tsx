@@ -34,7 +34,7 @@ const Index = () => {
               </motion.span>
               <div>
                 <h1 className="font-display font-bold text-xl">SpendSmart</h1>
-                <p className="text-xs text-muted-foreground">Track every penny</p>
+                <p className="text-xs text-muted-foreground">Stay on top of what you spend on</p>
               </div>
             </div>
 

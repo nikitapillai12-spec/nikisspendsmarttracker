@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Target } from 'lucide-react';
 import { DayBox } from './DayBox';
+import { CategoryManager } from './CategoryManager';
 import { BudgetData, Category, SpendEntry } from '@/lib/budget-types';
 import { getWeekStart, getWeekEnd, getWeekDays, formatDate, formatMonth, formatDisplayMonth, navigateWeek, getWeeklyBudget } from '@/lib/date-utils';
 import { addEntry, updateEntry, deleteEntry, getMonthlyBudget, setMonthlyBudget } from '@/lib/budget-store';
@@ -67,7 +68,7 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
       {/* Week Navigation & Budget */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => setWeekStart(navigateWeek(weekStart, 'prev'))}>
+          <Button variant="outline" size="icon" className="h-9 w-9 rounded-full" onClick={() => setWeekStart(navigateWeek(weekStart, 'prev'))}>
             <ChevronLeft className="w-4 h-4" />
           </Button>
           <div className="text-center">
@@ -76,7 +77,7 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
             </h2>
             <p className="text-xs text-muted-foreground">{formatDisplayMonth(weekStart)}</p>
           </div>
-          <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => setWeekStart(navigateWeek(weekStart, 'next'))}>
+          <Button variant="outline" size="icon" className="h-9 w-9 rounded-full" onClick={() => setWeekStart(navigateWeek(weekStart, 'next'))}>
             <ChevronRight className="w-4 h-4" />
           </Button>
           <Button variant="ghost" size="sm" className="text-xs" onClick={() => setWeekStart(getWeekStart(new Date()))}>
@@ -90,7 +91,7 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
             key={weekTotal}
             initial={{ scale: 0.9 }}
             animate={{ scale: 1 }}
-            className="px-4 py-2 rounded-lg bg-secondary font-display"
+            className="px-4 py-2 rounded-xl bg-secondary font-display"
           >
             <span className="text-xs text-muted-foreground">Week Total</span>
             <p className="font-bold text-lg">£{weekTotal.toFixed(2)}</p>
@@ -102,7 +103,7 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
               key={budgetDiff}
               initial={{ scale: 0.9 }}
               animate={{ scale: 1 }}
-              className={`px-4 py-2 rounded-lg font-display ${
+              className={`px-4 py-2 rounded-xl font-display ${
                 budgetDiff >= 0
                   ? 'bg-budget-under/10 text-budget-under'
                   : 'bg-budget-over/10 text-budget-over'
@@ -120,7 +121,7 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
           {/* Set Budget */}
           <Dialog open={budgetDialogOpen} onOpenChange={setBudgetDialogOpen}>
             <DialogTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setBudgetInput(currentBudget?.toString() || '')}>
+              <Button variant="outline" size="sm" className="gap-1.5 rounded-full" onClick={() => setBudgetInput(currentBudget?.toString() || '')}>
                 <Target className="w-4 h-4" />
                 {currentBudget ? 'Edit Budget' : 'Set Budget'}
               </Button>
@@ -153,6 +154,8 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
               </div>
             </DialogContent>
           </Dialog>
+
+          <CategoryManager data={data} onDataChange={onDataChange} />
         </div>
       </div>
 
@@ -172,6 +175,7 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
                 date={day}
                 dateStr={dateStr}
                 entries={dayEntries}
+                customCategories={data.customCategories}
                 onAdd={(amount, category) => handleAdd(dateStr, amount, category)}
                 onUpdate={handleUpdate}
                 onDelete={handleDelete}

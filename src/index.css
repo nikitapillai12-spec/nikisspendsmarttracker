@@ -6,53 +6,44 @@
 
 @layer base {
   :root {
-    --background: 230 25% 97%;
-    --foreground: 230 25% 10%;
+    --background: 40 40% 96%;
+    --foreground: 340 20% 15%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 230 25% 10%;
+    --card: 40 50% 99%;
+    --card-foreground: 340 20% 15%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 230 25% 10%;
+    --popover: 40 50% 99%;
+    --popover-foreground: 340 20% 15%;
 
-    --primary: 250 75% 60%;
+    --primary: 340 75% 55%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 230 20% 93%;
-    --secondary-foreground: 230 25% 15%;
+    --secondary: 45 60% 92%;
+    --secondary-foreground: 340 20% 20%;
 
-    --muted: 230 15% 92%;
-    --muted-foreground: 230 10% 45%;
+    --muted: 40 30% 90%;
+    --muted-foreground: 340 10% 45%;
 
-    --accent: 170 70% 45%;
+    --accent: 160 60% 45%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 75% 55%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 230 15% 88%;
-    --input: 230 15% 88%;
-    --ring: 250 75% 60%;
+    --border: 40 25% 85%;
+    --input: 40 25% 85%;
+    --ring: 340 75% 55%;
 
     --radius: 0.75rem;
-
-    /* Category colors */
-    --cat-groceries: 145 65% 42%;
-    --cat-eating-out: 25 95% 55%;
-    --cat-coffee: 30 60% 40%;
-    --cat-transport: 210 80% 55%;
-    --cat-home: 280 55% 55%;
-    --cat-toiletries: 330 65% 58%;
-    --cat-gifts: 350 80% 60%;
-    --cat-health: 170 70% 45%;
-    --cat-subscriptions: 250 65% 58%;
-    --cat-utilities: 45 85% 50%;
-    --cat-other: 230 10% 55%;
 
     /* Budget colors */
     --budget-under: 145 70% 42%;
     --budget-over: 0 75% 55%;
     --budget-warning: 40 90% 50%;
+
+    /* Fun gradient accents */
+    --gradient-warm: linear-gradient(135deg, hsl(340 75% 55%), hsl(25 95% 58%));
+    --gradient-cool: linear-gradient(135deg, hsl(160 60% 45%), hsl(210 80% 58%));
 
     /* Fonts */
     --font-display: 'Space Grotesk', sans-serif;
@@ -69,25 +60,25 @@
   }
 
   .dark {
-    --background: 230 25% 8%;
-    --foreground: 230 15% 90%;
-    --card: 230 25% 12%;
-    --card-foreground: 230 15% 90%;
-    --popover: 230 25% 12%;
-    --popover-foreground: 230 15% 90%;
-    --primary: 250 75% 65%;
+    --background: 340 20% 8%;
+    --foreground: 40 30% 90%;
+    --card: 340 20% 12%;
+    --card-foreground: 40 30% 90%;
+    --popover: 340 20% 12%;
+    --popover-foreground: 40 30% 90%;
+    --primary: 340 75% 60%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 230 20% 18%;
-    --secondary-foreground: 230 15% 85%;
-    --muted: 230 15% 18%;
-    --muted-foreground: 230 10% 55%;
-    --accent: 170 70% 45%;
+    --secondary: 340 15% 18%;
+    --secondary-foreground: 40 30% 85%;
+    --muted: 340 10% 18%;
+    --muted-foreground: 340 10% 55%;
+    --accent: 160 60% 45%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 100%;
-    --border: 230 15% 20%;
-    --input: 230 15% 20%;
-    --ring: 250 75% 65%;
+    --border: 340 10% 20%;
+    --input: 340 10% 20%;
+    --ring: 340 75% 60%;
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;
@@ -119,5 +110,14 @@
   }
   .font-body {
     font-family: var(--font-body);
+  }
+  .gradient-warm {
+    background: linear-gradient(135deg, hsl(340 75% 55%), hsl(25 95% 58%));
+  }
+  .gradient-cool {
+    background: linear-gradient(135deg, hsl(160 60% 45%), hsl(210 80% 58%));
+  }
+  .gradient-fun {
+    background: linear-gradient(135deg, hsl(45 90% 55%), hsl(340 75% 55%), hsl(250 70% 62%));
   }
 }
