@@ -125,11 +125,19 @@ export const PasscodeGate = ({ children }: PasscodeGateProps) => {
           <input
             ref={inputRef}
             type="password"
+            inputMode="numeric"
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            enterKeyHint="go"
             value={currentValue}
             onChange={(e) => { setCurrentValue(e.target.value); setError(''); }}
             onKeyDown={handleKeyDown}
+            onTouchStart={(e) => { e.currentTarget.focus(); }}
             placeholder="••••••"
-            className="w-full h-14 text-center text-2xl tracking-[0.5em] rounded-xl border-2 border-border bg-card focus:border-primary focus:outline-none transition-colors font-mono"
+            style={{ fontSize: '24px', userSelect: 'text', WebkitUserSelect: 'text', touchAction: 'manipulation' }}
+            className="w-full h-14 text-center tracking-[0.5em] rounded-xl border-2 border-border bg-card focus:border-primary focus:outline-none transition-colors font-mono"
           />
         </motion.div>
 
