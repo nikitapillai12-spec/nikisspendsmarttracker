@@ -94,6 +94,7 @@ const Index = () => {
               </button>
             </div>
             </div>
+          </div>
         </div>
       </header>
 
