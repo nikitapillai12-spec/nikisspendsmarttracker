@@ -6,8 +6,8 @@ interface PasscodeGateProps {
   children: React.ReactNode;
 }
 
-const PASSCODE_KEY = 'spendsmart_passcode';
-const SESSION_KEY = 'spendsmart_unlocked';
+export const PASSCODE_KEY = 'spendsmart_passcode';
+export const SESSION_KEY = 'spendsmart_unlocked';
 
 export const PasscodeGate = ({ children }: PasscodeGateProps) => {
   const [mode, setMode] = useState<'loading' | 'setup' | 'login' | 'unlocked'>('loading');

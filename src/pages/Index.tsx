@@ -1,11 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Wallet, BarChart3 } from 'lucide-react';
+import { Wallet, BarChart3, Settings, KeyRound, Lock } from 'lucide-react';
 import { WeeklyView } from '@/components/WeeklyView';
 import { MonthlyOverview } from '@/components/MonthlyOverview';
-import { PasscodeGate } from '@/components/PasscodeGate';
+import { PasscodeGate, PASSCODE_KEY, SESSION_KEY } from '@/components/PasscodeGate';
 import { BudgetData } from '@/lib/budget-types';
 import { getAll } from '@/lib/budget-store';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 type Tab = 'weekly' | 'monthly';
 
@@ -38,6 +44,30 @@ const Index = () => {
               </div>
             </div>
 
+            <div className="flex items-center gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="p-2 rounded-lg hover:bg-secondary transition-colors">
+                    <Settings className="w-5 h-5 text-muted-foreground" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => {
+                    localStorage.removeItem(PASSCODE_KEY);
+                    sessionStorage.removeItem(SESSION_KEY);
+                    window.location.reload();
+                  }}>
+                    <KeyRound className="w-4 h-4 mr-2" /> Change Passcode
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => {
+                    sessionStorage.removeItem(SESSION_KEY);
+                    window.location.reload();
+                  }}>
+                    <Lock className="w-4 h-4 mr-2" /> Lock App
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
             {/* Tab Switcher */}
             <div className="flex rounded-lg bg-secondary p-1 gap-1">
               <button
@@ -62,6 +92,7 @@ const Index = () => {
                 <BarChart3 className="w-4 h-4" />
                 Monthly
               </button>
+            </div>
             </div>
           </div>
         </div>
