@@ -93,7 +93,7 @@ const Index = () => {
                 Monthly
               </button>
             </div>
-          </div>
+            </div>
         </div>
       </header>
 
