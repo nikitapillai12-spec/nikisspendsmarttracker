@@ -1,11 +1,11 @@
 import { useState, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Target } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Target, Tag } from 'lucide-react';
 import { DayBox } from './DayBox';
 import { CategoryManager } from './CategoryManager';
-import { BudgetData, Category, SpendEntry } from '@/lib/budget-types';
+import { BudgetData, Category, SpendEntry, getAllCategories, getCategoryEmoji, getCategoryColor } from '@/lib/budget-types';
 import { getWeekStart, getWeekEnd, getWeekDays, formatDate, formatMonth, formatDisplayMonth, navigateWeek, getWeeklyBudget } from '@/lib/date-utils';
-import { addEntry, updateEntry, deleteEntry, getMonthlyBudget, setMonthlyBudget } from '@/lib/budget-store';
+import { addEntry, updateEntry, deleteEntry, getMonthlyBudget, setMonthlyBudget, setCategoryBudget, deleteCategoryBudget, getEffectiveCategoryBudget } from '@/lib/budget-store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -19,12 +19,14 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
   const [weekStart, setWeekStart] = useState(() => getWeekStart(new Date()));
   const [budgetInput, setBudgetInput] = useState('');
   const [budgetDialogOpen, setBudgetDialogOpen] = useState(false);
+  const [catBudgetInputs, setCatBudgetInputs] = useState<Record<string, string>>({});
 
   const weekEnd = getWeekEnd(weekStart);
   const days = getWeekDays(weekStart);
   const month = formatMonth(weekStart);
   const currentBudget = getMonthlyBudget(month);
   const weeklyBudget = currentBudget ? getWeeklyBudget(currentBudget) : null;
+  const allCats = useMemo(() => getAllCategories(data.customCategories), [data.customCategories]);
 
   const weekEntries = useMemo(() => {
     const start = formatDate(weekStart);
@@ -54,18 +56,52 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
     onDataChange(deleteEntry(id));
   }, [onDataChange]);
 
-  const handleSetBudget = () => {
-    const val = parseFloat(budgetInput);
-    if (val > 0) {
-      onDataChange(setMonthlyBudget(month, val));
-      setBudgetDialogOpen(false);
-      setBudgetInput('');
-    }
+  const openBudgetDialog = () => {
+    setBudgetInput(currentBudget?.toString() || '');
+    const init: Record<string, string> = {};
+    allCats.forEach(c => {
+      const v = getEffectiveCategoryBudget(data, c, month);
+      init[c] = v !== null ? v.toString() : '';
+    });
+    setCatBudgetInputs(init);
+    setBudgetDialogOpen(true);
   };
+
+  const handleSetBudget = () => {
+    let latest = data;
+    const val = parseFloat(budgetInput);
+    if (!Number.isNaN(val) && val > 0) {
+      latest = setMonthlyBudget(month, val);
+    }
+    Object.entries(catBudgetInputs).forEach(([cat, raw]) => {
+      const trimmed = raw.trim();
+      if (trimmed === '') {
+        const hasAtThisMonth = (latest.categoryBudgets || []).some(b => b.category === cat && b.month === month);
+        if (hasAtThisMonth) latest = deleteCategoryBudget(cat, month);
+        return;
+      }
+      const n = parseFloat(trimmed);
+      if (!Number.isNaN(n) && n >= 0) {
+        latest = setCategoryBudget(cat, month, n);
+      }
+    });
+    onDataChange(latest);
+    setBudgetDialogOpen(false);
+    setBudgetInput('');
+    setCatBudgetInputs({});
+  };
+
+  const updateCatBudget = (cat: string, val: string) => {
+    setCatBudgetInputs(prev => ({ ...prev, [cat]: val }));
+  };
+
+  const totalCategoryBudgets = Object.values(catBudgetInputs).reduce((s, v) => {
+    const n = parseFloat(v);
+    return Number.isNaN(n) ? s : s + n;
+  }, 0);
 
   return (
     <div className="space-y-6">
-      {/* Week Navigation & Budget */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <Button variant="outline" size="icon" className="h-9 w-9 rounded-full" onClick={() => setWeekStart(navigateWeek(weekStart, 'prev'))}>
@@ -86,7 +122,6 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
-          {/* Week Total */}
           <motion.div
             key={weekTotal}
             initial={{ scale: 0.9 }}
@@ -97,7 +132,6 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
             <p className="font-bold text-lg">£{weekTotal.toFixed(2)}</p>
           </motion.div>
 
-          {/* Budget Status */}
           {weeklyBudget !== null && budgetDiff !== null && (
             <motion.div
               key={budgetDiff}
@@ -118,28 +152,27 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
             </motion.div>
           )}
 
-          {/* Set Budget */}
-          <Dialog open={budgetDialogOpen} onOpenChange={setBudgetDialogOpen}>
+          <Dialog open={budgetDialogOpen} onOpenChange={(v) => { if (v) openBudgetDialog(); else setBudgetDialogOpen(false); }}>
             <DialogTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-1.5 rounded-full" onClick={() => setBudgetInput(currentBudget?.toString() || '')}>
+              <Button variant="outline" size="sm" className="gap-1.5 rounded-full">
                 <Target className="w-4 h-4" />
                 {currentBudget ? 'Edit Budget' : 'Set Budget'}
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle className="font-display">Monthly Budget for {formatDisplayMonth(weekStart)}</DialogTitle>
+                <DialogTitle className="font-display">Budgets for {formatDisplayMonth(weekStart)}</DialogTitle>
               </DialogHeader>
-              <div className="space-y-4 pt-2">
+              <p className="text-xs text-muted-foreground -mt-1">Changes apply from this month forward. Earlier months keep their existing budgets.</p>
+              <div className="space-y-5 pt-3">
                 <div>
-                  <label className="text-sm text-muted-foreground mb-1.5 block">Monthly budget (£)</label>
+                  <label className="text-sm font-medium mb-1.5 block">Overall monthly budget (£)</label>
                   <Input
                     type="number"
                     step="0.01"
                     value={budgetInput}
                     onChange={(e) => setBudgetInput(e.target.value)}
                     placeholder="e.g. 2000"
-                    autoFocus
                     onKeyDown={(e) => e.key === 'Enter' && handleSetBudget()}
                   />
                   {budgetInput && parseFloat(budgetInput) > 0 && (
@@ -148,8 +181,37 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
                     </p>
                   )}
                 </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-medium flex items-center gap-1.5"><Tag className="w-4 h-4" /> Per-category budgets (optional)</label>
+                    <span className="text-xs text-muted-foreground">Sum: £{totalCategoryBudgets.toFixed(2)}</span>
+                  </div>
+                  <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
+                    {allCats.map(cat => (
+                      <div key={cat} className="flex items-center gap-2">
+                        <span
+                          className="w-7 h-7 rounded-full flex items-center justify-center text-sm shrink-0"
+                          style={{ background: `${getCategoryColor(cat, data.customCategories)}22` }}
+                        >
+                          {getCategoryEmoji(cat, data.customCategories)}
+                        </span>
+                        <span className="flex-1 text-sm truncate">{cat}</span>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={catBudgetInputs[cat] || ''}
+                          onChange={(e) => updateCatBudget(cat, e.target.value)}
+                          placeholder="—"
+                          className="h-8 w-24 text-sm text-right"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
                 <Button className="w-full" onClick={handleSetBudget}>
-                  Save Budget
+                  Save Budgets
                 </Button>
               </div>
             </DialogContent>
@@ -159,7 +221,6 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
         </div>
       </div>
 
-      {/* Day Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
         {days.map((day, i) => {
           const dateStr = formatDate(day);

@@ -74,10 +74,17 @@ export interface MonthlyBudget {
   amount: number;
 }
 
+export interface CategoryBudget {
+  category: string;
+  month: string; // YYYY-MM — effective from this month forward
+  amount: number;
+}
+
 export interface BudgetData {
   entries: SpendEntry[];
   monthlyBudgets: MonthlyBudget[];
   customCategories: CustomCategory[];
+  categoryBudgets?: CategoryBudget[];
 }
 
 // Helper to get all categories (default + custom)

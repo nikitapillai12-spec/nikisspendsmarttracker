@@ -13,7 +13,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
-type Tab = 'weekly' | 'monthly';
+type Tab = 'weekly' | 'timeseries';
 
 const Index = () => {
   const [tab, setTab] = useState<Tab>('weekly');
@@ -82,15 +82,15 @@ const Index = () => {
                 Weekly
               </button>
               <button
-                onClick={() => setTab('monthly')}
+                onClick={() => setTab('timeseries')}
                 className={`flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium font-display transition-all ${
-                  tab === 'monthly'
+                  tab === 'timeseries'
                     ? 'bg-card shadow-sm text-foreground'
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 <BarChart3 className="w-4 h-4" />
-                Monthly
+                Time Series
               </button>
             </div>
             </div>
@@ -113,7 +113,7 @@ const Index = () => {
             </motion.div>
           ) : (
             <motion.div
-              key="monthly"
+              key="timeseries"
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
