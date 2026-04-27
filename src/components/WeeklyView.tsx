@@ -20,6 +20,7 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
   const [budgetInput, setBudgetInput] = useState('');
   const [budgetDialogOpen, setBudgetDialogOpen] = useState(false);
   const [catBudgetInputs, setCatBudgetInputs] = useState<Record<string, string>>({});
+  const [budgetMode, setBudgetMode] = useState<'total' | 'categories'>('total');
 
   const weekEnd = getWeekEnd(weekStart);
   const days = getWeekDays(weekStart);
@@ -59,32 +60,48 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
   const openBudgetDialog = () => {
     setBudgetInput(currentBudget?.toString() || '');
     const init: Record<string, string> = {};
+    let hasAnyCat = false;
     allCats.forEach(c => {
       const v = getEffectiveCategoryBudget(data, c, month);
+      if (v !== null) hasAnyCat = true;
       init[c] = v !== null ? v.toString() : '';
     });
     setCatBudgetInputs(init);
+    setBudgetMode(hasAnyCat && !currentBudget ? 'categories' : 'total');
     setBudgetDialogOpen(true);
   };
 
   const handleSetBudget = () => {
     let latest = data;
-    const val = parseFloat(budgetInput);
-    if (!Number.isNaN(val) && val > 0) {
-      latest = setMonthlyBudget(month, val);
+    if (budgetMode === 'total') {
+      const val = parseFloat(budgetInput);
+      if (!Number.isNaN(val) && val > 0) {
+        latest = setMonthlyBudget(month, val);
+      }
+      // Clear any per-category budgets set at this exact month so totals drive
+      (latest.categoryBudgets || [])
+        .filter(b => b.month === month)
+        .forEach(b => { latest = deleteCategoryBudget(b.category, month); });
+    } else {
+      // Categories mode: save each category budget, auto-compute total
+      let sum = 0;
+      Object.entries(catBudgetInputs).forEach(([cat, raw]) => {
+        const trimmed = raw.trim();
+        if (trimmed === '') {
+          const hasAtThisMonth = (latest.categoryBudgets || []).some(b => b.category === cat && b.month === month);
+          if (hasAtThisMonth) latest = deleteCategoryBudget(cat, month);
+          return;
+        }
+        const n = parseFloat(trimmed);
+        if (!Number.isNaN(n) && n >= 0) {
+          latest = setCategoryBudget(cat, month, n);
+          sum += n;
+        }
+      });
+      if (sum > 0) {
+        latest = setMonthlyBudget(month, sum);
+      }
     }
-    Object.entries(catBudgetInputs).forEach(([cat, raw]) => {
-      const trimmed = raw.trim();
-      if (trimmed === '') {
-        const hasAtThisMonth = (latest.categoryBudgets || []).some(b => b.category === cat && b.month === month);
-        if (hasAtThisMonth) latest = deleteCategoryBudget(cat, month);
-        return;
-      }
-      const n = parseFloat(trimmed);
-      if (!Number.isNaN(n) && n >= 0) {
-        latest = setCategoryBudget(cat, month, n);
-      }
-    });
     onDataChange(latest);
     setBudgetDialogOpen(false);
     setBudgetInput('');
@@ -165,50 +182,75 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
               </DialogHeader>
               <p className="text-xs text-muted-foreground -mt-1">Changes apply from this month forward. Earlier months keep their existing budgets.</p>
               <div className="space-y-5 pt-3">
-                <div>
-                  <label className="text-sm font-medium mb-1.5 block">Overall monthly budget (£)</label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={budgetInput}
-                    onChange={(e) => setBudgetInput(e.target.value)}
-                    placeholder="e.g. 2000"
-                    onKeyDown={(e) => e.key === 'Enter' && handleSetBudget()}
-                  />
-                  {budgetInput && parseFloat(budgetInput) > 0 && (
-                    <p className="text-xs text-muted-foreground mt-2">
-                      ≈ £{getWeeklyBudget(parseFloat(budgetInput)).toFixed(2)} per week
-                    </p>
-                  )}
+                <div className="grid grid-cols-2 gap-2 p-1 rounded-full bg-secondary">
+                  <button
+                    type="button"
+                    onClick={() => setBudgetMode('total')}
+                    className={`text-xs font-medium rounded-full py-2 transition-colors ${budgetMode === 'total' ? 'bg-background shadow-sm' : 'text-muted-foreground'}`}
+                  >
+                    Total monthly budget
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBudgetMode('categories')}
+                    className={`text-xs font-medium rounded-full py-2 transition-colors ${budgetMode === 'categories' ? 'bg-background shadow-sm' : 'text-muted-foreground'}`}
+                  >
+                    By category (auto-total)
+                  </button>
                 </div>
 
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-sm font-medium flex items-center gap-1.5"><Tag className="w-4 h-4" /> Per-category budgets (optional)</label>
-                    <span className="text-xs text-muted-foreground">Sum: £{totalCategoryBudgets.toFixed(2)}</span>
+                {budgetMode === 'total' ? (
+                  <div>
+                    <label className="text-sm font-medium mb-1.5 block">Overall monthly budget (£)</label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={budgetInput}
+                      onChange={(e) => setBudgetInput(e.target.value)}
+                      placeholder="e.g. 2000"
+                      onKeyDown={(e) => e.key === 'Enter' && handleSetBudget()}
+                    />
+                    {budgetInput && parseFloat(budgetInput) > 0 && (
+                      <p className="text-xs text-muted-foreground mt-2">
+                        ≈ £{getWeeklyBudget(parseFloat(budgetInput)).toFixed(2)} per week
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground mt-3">
+                      Set a single total for the month. Per-category budgets for this month will be cleared.
+                    </p>
                   </div>
-                  <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
-                    {allCats.map(cat => (
-                      <div key={cat} className="flex items-center gap-2">
-                        <span
-                          className="w-7 h-7 rounded-full flex items-center justify-center text-sm shrink-0"
-                          style={{ background: `${getCategoryColor(cat, data.customCategories)}22` }}
-                        >
-                          {getCategoryEmoji(cat, data.customCategories)}
-                        </span>
-                        <span className="flex-1 text-sm truncate">{cat}</span>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={catBudgetInputs[cat] || ''}
-                          onChange={(e) => updateCatBudget(cat, e.target.value)}
-                          placeholder="—"
-                          className="h-8 w-24 text-sm text-right"
-                        />
-                      </div>
-                    ))}
+                ) : (
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-sm font-medium flex items-center gap-1.5"><Tag className="w-4 h-4" /> Per-category budgets</label>
+                      <span className="text-xs font-semibold">Total: £{totalCategoryBudgets.toFixed(2)}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Fill only the ones that matter. Your overall monthly budget will be the sum (≈ £{getWeeklyBudget(totalCategoryBudgets).toFixed(2)}/wk).
+                    </p>
+                    <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
+                      {allCats.map(cat => (
+                        <div key={cat} className="flex items-center gap-2">
+                          <span
+                            className="w-7 h-7 rounded-full flex items-center justify-center text-sm shrink-0"
+                            style={{ background: `${getCategoryColor(cat, data.customCategories)}22` }}
+                          >
+                            {getCategoryEmoji(cat, data.customCategories)}
+                          </span>
+                          <span className="flex-1 text-sm truncate">{cat}</span>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={catBudgetInputs[cat] || ''}
+                            onChange={(e) => updateCatBudget(cat, e.target.value)}
+                            placeholder="—"
+                            className="h-8 w-24 text-sm text-right"
+                          />
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <Button className="w-full" onClick={handleSetBudget}>
                   Save Budgets
