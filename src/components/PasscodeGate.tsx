@@ -1,12 +1,21 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Lock, KeyRound, Check, X } from 'lucide-react';
+import { Lock, KeyRound, Check, X, Loader2 } from 'lucide-react';
+import {
+  findVaultByPasscode,
+  createVault,
+  setStoredVaultId,
+  getStoredVaultId,
+  clearStoredVaultId,
+} from '@/lib/vault-store';
+import { initStore, migrateLocalDataIfAny } from '@/lib/budget-store';
 
 interface PasscodeGateProps {
   children: React.ReactNode;
 }
 
-export const PASSCODE_KEY = 'spendsmart_passcode';
+// Kept for backwards compatibility with Settings menu imports.
+export const PASSCODE_KEY = 'spendsmart_passcode'; // legacy, no longer written
 export const SESSION_KEY = 'spendsmart_unlocked';
 
 export const PasscodeGate = ({ children }: PasscodeGateProps) => {
@@ -16,17 +25,22 @@ export const PasscodeGate = ({ children }: PasscodeGateProps) => {
   const [step, setStep] = useState<'enter' | 'confirm'>('enter');
   const [error, setError] = useState('');
   const [shake, setShake] = useState(false);
+  const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const stored = localStorage.getItem(PASSCODE_KEY);
+    const vaultId = getStoredVaultId();
     const session = sessionStorage.getItem(SESSION_KEY);
-    if (!stored) {
-      setMode('setup');
-    } else if (session === 'true') {
-      setMode('unlocked');
-    } else {
+    if (vaultId && session === 'true') {
+      // Already unlocked on this device — hydrate cache and go.
+      initStore().then(() => setMode('unlocked'));
+    } else if (vaultId) {
+      // This device has a known vault but needs login.
       setMode('login');
+    } else {
+      // Brand new device. Setup flow — but if a passcode matches an existing
+      // vault in the cloud, we'll link it instead of creating a new one.
+      setMode('setup');
     }
   }, []);
 
@@ -42,7 +56,16 @@ export const PasscodeGate = ({ children }: PasscodeGateProps) => {
     setTimeout(() => setShake(false), 500);
   };
 
-  const handleSetup = () => {
+  const unlockWithVault = async (vaultId: string, runMigrate: boolean) => {
+    setStoredVaultId(vaultId);
+    sessionStorage.setItem(SESSION_KEY, 'true');
+    if (runMigrate) await migrateLocalDataIfAny();
+    await initStore();
+    setMode('unlocked');
+  };
+
+  const handleSetup = async () => {
+    if (busy) return;
     if (step === 'enter') {
       if (passcode.length < 4) {
         triggerShake('At least 4 characters');
@@ -51,26 +74,46 @@ export const PasscodeGate = ({ children }: PasscodeGateProps) => {
       setStep('confirm');
       setConfirmPasscode('');
       setError('');
-    } else {
-      if (confirmPasscode !== passcode) {
-        triggerShake('Passcodes don\'t match');
-        setConfirmPasscode('');
-        return;
+      return;
+    }
+    if (confirmPasscode !== passcode) {
+      triggerShake('Passcodes don\'t match');
+      setConfirmPasscode('');
+      return;
+    }
+    setBusy(true);
+    try {
+      // First check if a vault with this passcode already exists in the cloud
+      // (i.e. user setting up on a second device). If so, link to it.
+      const existing = await findVaultByPasscode(passcode);
+      if (existing) {
+        await unlockWithVault(existing, false);
+      } else {
+        const newId = await createVault(passcode);
+        if (!newId) {
+          triggerShake('Could not set up. Check your connection and try again.');
+          return;
+        }
+        await unlockWithVault(newId, true);
       }
-      localStorage.setItem(PASSCODE_KEY, btoa(passcode));
-      sessionStorage.setItem(SESSION_KEY, 'true');
-      setMode('unlocked');
+    } finally {
+      setBusy(false);
     }
   };
 
-  const handleLogin = () => {
-    const stored = localStorage.getItem(PASSCODE_KEY);
-    if (stored && atob(stored) === passcode) {
-      sessionStorage.setItem(SESSION_KEY, 'true');
-      setMode('unlocked');
-    } else {
-      triggerShake('Wrong passcode');
-      setPasscode('');
+  const handleLogin = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const match = await findVaultByPasscode(passcode);
+      if (match) {
+        await unlockWithVault(match, false);
+      } else {
+        triggerShake('Wrong passcode');
+        setPasscode('');
+      }
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -80,7 +123,13 @@ export const PasscodeGate = ({ children }: PasscodeGateProps) => {
     }
   };
 
-  if (mode === 'loading') return null;
+  if (mode === 'loading') {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
   if (mode === 'unlocked') return <>{children}</>;
 
   const isSetup = mode === 'setup';
@@ -112,7 +161,7 @@ export const PasscodeGate = ({ children }: PasscodeGateProps) => {
           <p className="text-sm text-muted-foreground mt-1">
             {isSetup
               ? step === 'enter'
-                ? 'Choose a passcode to protect your data'
+                ? 'Use the same passcode on all your devices to sync'
                 : 'Confirm your passcode'
               : 'Enter your passcode to continue'}
           </p>
@@ -158,9 +207,12 @@ export const PasscodeGate = ({ children }: PasscodeGateProps) => {
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           onClick={isSetup ? handleSetup : handleLogin}
-          className="w-full mt-4 h-12 rounded-xl bg-primary text-primary-foreground font-display font-semibold text-base flex items-center justify-center gap-2 hover:opacity-90 transition-opacity"
+          disabled={busy}
+          className="w-full mt-4 h-12 rounded-xl bg-primary text-primary-foreground font-display font-semibold text-base flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-60"
         >
-          {isSetup ? (
+          {busy ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : isSetup ? (
             step === 'enter' ? 'Next' : <><Check className="w-4 h-4" /> Set Passcode</>
           ) : (
             <><Lock className="w-4 h-4" /> Unlock</>

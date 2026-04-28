@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Wallet, BarChart3, Settings, KeyRound, Lock } from 'lucide-react';
 import { WeeklyView } from '@/components/WeeklyView';
 import { MonthlyOverview } from '@/components/MonthlyOverview';
-import { PasscodeGate, PASSCODE_KEY, SESSION_KEY } from '@/components/PasscodeGate';
+import { PasscodeGate, SESSION_KEY } from '@/components/PasscodeGate';
 import { BudgetData } from '@/lib/budget-types';
-import { getAll } from '@/lib/budget-store';
+import { getAll, subscribeStore } from '@/lib/budget-store';
+import { clearStoredVaultId } from '@/lib/vault-store';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,6 +19,12 @@ type Tab = 'weekly' | 'timeseries';
 const Index = () => {
   const [tab, setTab] = useState<Tab>('weekly');
   const [data, setData] = useState<BudgetData>(() => getAll());
+
+  useEffect(() => {
+    setData({ ...getAll() });
+    const unsub = subscribeStore(d => setData({ ...d }));
+    return () => { unsub(); };
+  }, []);
 
   const refreshData = (newData: BudgetData) => {
     setData({ ...newData });
@@ -53,7 +60,7 @@ const Index = () => {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem onClick={() => {
-                    localStorage.removeItem(PASSCODE_KEY);
+                    clearStoredVaultId();
                     sessionStorage.removeItem(SESSION_KEY);
                     window.location.reload();
                   }}>
