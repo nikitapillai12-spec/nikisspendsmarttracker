@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Wallet, BarChart3, Settings, KeyRound, Lock } from 'lucide-react';
+import { Wallet, BarChart3, Settings, KeyRound, Lock, CloudUpload, RefreshCw } from 'lucide-react';
 import { WeeklyView } from '@/components/WeeklyView';
 import { MonthlyOverview } from '@/components/MonthlyOverview';
 import { PasscodeGate, SESSION_KEY } from '@/components/PasscodeGate';
 import { BudgetData } from '@/lib/budget-types';
-import { getAll, subscribeStore } from '@/lib/budget-store';
+import { getAll, subscribeStore, initStore, migrateLocalDataIfAny } from '@/lib/budget-store';
 import { clearStoredVaultId } from '@/lib/vault-store';
+import { toast } from '@/components/ui/sonner';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -59,6 +60,19 @@ const Index = () => {
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={async () => {
+                    const did = await migrateLocalDataIfAny();
+                    await initStore();
+                    toast(did ? 'Local data pushed to cloud' : 'No local-only data to sync');
+                  }}>
+                    <CloudUpload className="w-4 h-4 mr-2" /> Push Local Data to Cloud
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={async () => {
+                    await initStore();
+                    toast('Re-synced from cloud');
+                  }}>
+                    <RefreshCw className="w-4 h-4 mr-2" /> Re-sync From Cloud
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => {
                     clearStoredVaultId();
                     sessionStorage.removeItem(SESSION_KEY);
