@@ -99,7 +99,7 @@ export function addEntry(entry: SpendEntry): BudgetData {
 export function updateEntry(id: string, updates: Partial<Pick<SpendEntry, 'amount' | 'category'>>): BudgetData {
   cache.entries = cache.entries.map(e => e.id === id ? { ...e, ...updates } : e);
   notify();
-  const patch: Record<string, unknown> = {};
+  const patch: { amount?: number; category?: string } = {};
   if (updates.amount !== undefined) patch.amount = updates.amount;
   if (updates.category !== undefined) patch.category = updates.category;
   supabase.from('spend_entries').update(patch).eq('id', id)
