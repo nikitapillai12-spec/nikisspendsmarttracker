@@ -14,7 +14,158 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      category_budgets: {
+        Row: {
+          amount: number
+          category: string
+          id: string
+          month: string
+          vault_id: string
+        }
+        Insert: {
+          amount: number
+          category: string
+          id?: string
+          month: string
+          vault_id: string
+        }
+        Update: {
+          amount?: number
+          category?: string
+          id?: string
+          month?: string
+          vault_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "category_budgets_vault_id_fkey"
+            columns: ["vault_id"]
+            isOneToOne: false
+            referencedRelation: "vaults"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      custom_categories: {
+        Row: {
+          color: string
+          created_at: string
+          emoji: string
+          id: string
+          name: string
+          vault_id: string
+        }
+        Insert: {
+          color: string
+          created_at?: string
+          emoji: string
+          id?: string
+          name: string
+          vault_id: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          emoji?: string
+          id?: string
+          name?: string
+          vault_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_categories_vault_id_fkey"
+            columns: ["vault_id"]
+            isOneToOne: false
+            referencedRelation: "vaults"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      monthly_budgets: {
+        Row: {
+          amount: number
+          id: string
+          month: string
+          vault_id: string
+        }
+        Insert: {
+          amount: number
+          id?: string
+          month: string
+          vault_id: string
+        }
+        Update: {
+          amount?: number
+          id?: string
+          month?: string
+          vault_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "monthly_budgets_vault_id_fkey"
+            columns: ["vault_id"]
+            isOneToOne: false
+            referencedRelation: "vaults"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      spend_entries: {
+        Row: {
+          amount: number
+          category: string
+          created_at: string
+          entry_date: string
+          id: string
+          vault_id: string
+        }
+        Insert: {
+          amount: number
+          category: string
+          created_at?: string
+          entry_date: string
+          id?: string
+          vault_id: string
+        }
+        Update: {
+          amount?: number
+          category?: string
+          created_at?: string
+          entry_date?: string
+          id?: string
+          vault_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spend_entries_vault_id_fkey"
+            columns: ["vault_id"]
+            isOneToOne: false
+            referencedRelation: "vaults"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vaults: {
+        Row: {
+          created_at: string
+          id: string
+          passcode_hash: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          passcode_hash: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          passcode_hash?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
