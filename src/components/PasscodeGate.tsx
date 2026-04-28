@@ -32,8 +32,11 @@ export const PasscodeGate = ({ children }: PasscodeGateProps) => {
     const vaultId = getStoredVaultId();
     const session = sessionStorage.getItem(SESSION_KEY);
     if (vaultId && session === 'true') {
-      // Already unlocked on this device — hydrate cache and go.
-      initStore().then(() => setMode('unlocked'));
+      // Already unlocked on this device — run migration (idempotent) in case
+      // legacy local data still lives here, then hydrate cache.
+      migrateLocalDataIfAny()
+        .then(() => initStore())
+        .then(() => setMode('unlocked'));
     } else if (vaultId) {
       // This device has a known vault but needs login.
       setMode('login');
