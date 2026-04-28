@@ -32,8 +32,11 @@ export const PasscodeGate = ({ children }: PasscodeGateProps) => {
     const vaultId = getStoredVaultId();
     const session = sessionStorage.getItem(SESSION_KEY);
     if (vaultId && session === 'true') {
-      // Already unlocked on this device — hydrate cache and go.
-      initStore().then(() => setMode('unlocked'));
+      // Already unlocked on this device — run migration (idempotent) in case
+      // legacy local data still lives here, then hydrate cache.
+      migrateLocalDataIfAny()
+        .then(() => initStore())
+        .then(() => setMode('unlocked'));
     } else if (vaultId) {
       // This device has a known vault but needs login.
       setMode('login');
@@ -59,7 +62,10 @@ export const PasscodeGate = ({ children }: PasscodeGateProps) => {
   const unlockWithVault = async (vaultId: string, runMigrate: boolean) => {
     setStoredVaultId(vaultId);
     sessionStorage.setItem(SESSION_KEY, 'true');
-    if (runMigrate) await migrateLocalDataIfAny();
+    // Always try migration — it's idempotent (upsert) and will only act if
+    // legacy localStorage data exists. This self-heals devices whose data
+    // was written locally before cross-device sync was wired up.
+    await migrateLocalDataIfAny();
     await initStore();
     setMode('unlocked');
   };
