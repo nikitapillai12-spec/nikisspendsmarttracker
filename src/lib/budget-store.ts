@@ -1,67 +1,135 @@
-import { BudgetData, SpendEntry, MonthlyBudget, CustomCategory, CategoryBudget } from './budget-types';
+import { BudgetData, SpendEntry, CustomCategory } from './budget-types';
+import { supabase } from '@/integrations/supabase/client';
+import { getStoredVaultId } from './vault-store';
 
-const STORAGE_KEY = 'budget-tracker-data';
+// In-memory cache. Populated by initStore() after passcode unlock.
+let cache: BudgetData = {
+  entries: [],
+  monthlyBudgets: [],
+  customCategories: [],
+  categoryBudgets: [],
+};
 
-function load(): BudgetData {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      // Migration: ensure customCategories exists
-      if (!parsed.customCategories) parsed.customCategories = [];
-      if (!parsed.categoryBudgets) parsed.categoryBudgets = [];
-      return parsed;
-    }
-  } catch {}
-  return { entries: [], monthlyBudgets: [], customCategories: [], categoryBudgets: [] };
+let initialized = false;
+const listeners = new Set<(d: BudgetData) => void>();
+
+function notify() {
+  const snap = { ...cache };
+  listeners.forEach(l => l(snap));
 }
 
-function save(data: BudgetData) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+export function subscribeStore(fn: (d: BudgetData) => void) {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
+
+function vaultId(): string {
+  const id = getStoredVaultId();
+  if (!id) throw new Error('No vault id — app not unlocked');
+  return id;
+}
+
+export async function initStore(): Promise<BudgetData> {
+  const vid = getStoredVaultId();
+  if (!vid) {
+    initialized = true;
+    return cache;
+  }
+  try {
+    const [entriesRes, mbRes, cbRes, ccRes] = await Promise.all([
+      supabase.from('spend_entries').select('*').eq('vault_id', vid),
+      supabase.from('monthly_budgets').select('*').eq('vault_id', vid),
+      supabase.from('category_budgets').select('*').eq('vault_id', vid),
+      supabase.from('custom_categories').select('*').eq('vault_id', vid),
+    ]);
+
+    cache = {
+      entries: (entriesRes.data || []).map(r => ({
+        id: r.id,
+        amount: Number(r.amount),
+        category: r.category,
+        date: r.entry_date,
+        createdAt: new Date(r.created_at).getTime(),
+      })),
+      monthlyBudgets: (mbRes.data || []).map(r => ({
+        month: r.month,
+        amount: Number(r.amount),
+      })),
+      categoryBudgets: (cbRes.data || []).map(r => ({
+        category: r.category,
+        month: r.month,
+        amount: Number(r.amount),
+      })),
+      customCategories: (ccRes.data || []).map(r => ({
+        name: r.name,
+        emoji: r.emoji,
+        color: r.color,
+      })),
+    };
+  } catch (e) {
+    console.error('initStore failed', e);
+  }
+  initialized = true;
+  notify();
+  return cache;
+}
+
+export function isInitialized() {
+  return initialized;
 }
 
 export function getAll(): BudgetData {
-  return load();
+  return cache;
 }
 
+// ---------- Entries ----------
 export function addEntry(entry: SpendEntry): BudgetData {
-  const data = load();
-  data.entries.push(entry);
-  save(data);
-  return data;
+  cache.entries.push(entry);
+  notify();
+  supabase.from('spend_entries').insert({
+    id: entry.id,
+    vault_id: vaultId(),
+    entry_date: entry.date,
+    amount: entry.amount,
+    category: entry.category,
+  }).then(({ error }) => { if (error) console.error('addEntry sync', error); });
+  return cache;
 }
 
 export function updateEntry(id: string, updates: Partial<Pick<SpendEntry, 'amount' | 'category'>>): BudgetData {
-  const data = load();
-  data.entries = data.entries.map(e => e.id === id ? { ...e, ...updates } : e);
-  save(data);
-  return data;
+  cache.entries = cache.entries.map(e => e.id === id ? { ...e, ...updates } : e);
+  notify();
+  const patch: Record<string, unknown> = {};
+  if (updates.amount !== undefined) patch.amount = updates.amount;
+  if (updates.category !== undefined) patch.category = updates.category;
+  supabase.from('spend_entries').update(patch).eq('id', id)
+    .then(({ error }) => { if (error) console.error('updateEntry sync', error); });
+  return cache;
 }
 
 export function deleteEntry(id: string): BudgetData {
-  const data = load();
-  data.entries = data.entries.filter(e => e.id !== id);
-  save(data);
-  return data;
+  cache.entries = cache.entries.filter(e => e.id !== id);
+  notify();
+  supabase.from('spend_entries').delete().eq('id', id)
+    .then(({ error }) => { if (error) console.error('deleteEntry sync', error); });
+  return cache;
 }
 
+// ---------- Monthly budgets ----------
 export function setMonthlyBudget(month: string, amount: number): BudgetData {
-  const data = load();
-  const existing = data.monthlyBudgets.find(b => b.month === month);
-  if (existing) {
-    existing.amount = amount;
-  } else {
-    data.monthlyBudgets.push({ month, amount });
-  }
-  save(data);
-  return data;
+  const existing = cache.monthlyBudgets.find(b => b.month === month);
+  if (existing) existing.amount = amount;
+  else cache.monthlyBudgets.push({ month, amount });
+  notify();
+  supabase.from('monthly_budgets').upsert(
+    { vault_id: vaultId(), month, amount },
+    { onConflict: 'vault_id,month' }
+  ).then(({ error }) => { if (error) console.error('setMonthlyBudget sync', error); });
+  return cache;
 }
 
-// Returns the effective overall monthly budget for the given month:
-// the most recent budget with month <= target month (forward-propagating).
 export function getMonthlyBudget(month: string): number | null {
-  const data = load();
-  return getEffectiveMonthlyBudget(data, month);
+  return getEffectiveMonthlyBudget(cache, month);
 }
 
 export function getEffectiveMonthlyBudget(data: BudgetData, month: string): number | null {
@@ -71,26 +139,29 @@ export function getEffectiveMonthlyBudget(data: BudgetData, month: string): numb
   return eligible.length ? eligible[0].amount : null;
 }
 
+// ---------- Category budgets ----------
 export function setCategoryBudget(category: string, month: string, amount: number): BudgetData {
-  const data = load();
-  if (!data.categoryBudgets) data.categoryBudgets = [];
-  const existing = data.categoryBudgets.find(b => b.category === category && b.month === month);
-  if (existing) {
-    existing.amount = amount;
-  } else {
-    data.categoryBudgets.push({ category, month, amount });
-  }
-  save(data);
-  return data;
+  if (!cache.categoryBudgets) cache.categoryBudgets = [];
+  const existing = cache.categoryBudgets.find(b => b.category === category && b.month === month);
+  if (existing) existing.amount = amount;
+  else cache.categoryBudgets.push({ category, month, amount });
+  notify();
+  supabase.from('category_budgets').upsert(
+    { vault_id: vaultId(), category, month, amount },
+    { onConflict: 'vault_id,category,month' }
+  ).then(({ error }) => { if (error) console.error('setCategoryBudget sync', error); });
+  return cache;
 }
 
 export function deleteCategoryBudget(category: string, month: string): BudgetData {
-  const data = load();
-  data.categoryBudgets = (data.categoryBudgets || []).filter(
+  cache.categoryBudgets = (cache.categoryBudgets || []).filter(
     b => !(b.category === category && b.month === month)
   );
-  save(data);
-  return data;
+  notify();
+  supabase.from('category_budgets').delete()
+    .eq('vault_id', vaultId()).eq('category', category).eq('month', month)
+    .then(({ error }) => { if (error) console.error('deleteCategoryBudget sync', error); });
+  return cache;
 }
 
 export function getEffectiveCategoryBudget(
@@ -106,34 +177,105 @@ export function getEffectiveCategoryBudget(
 }
 
 export function getEntriesForDate(date: string): SpendEntry[] {
-  return load().entries.filter(e => e.date === date);
+  return cache.entries.filter(e => e.date === date);
 }
 
 export function getEntriesForWeek(weekStart: string, weekEnd: string): SpendEntry[] {
-  return load().entries.filter(e => e.date >= weekStart && e.date <= weekEnd);
+  return cache.entries.filter(e => e.date >= weekStart && e.date <= weekEnd);
 }
 
+// ---------- Custom categories ----------
 export function addCustomCategory(cat: CustomCategory): BudgetData {
-  const data = load();
-  data.customCategories.push(cat);
-  save(data);
-  return data;
+  cache.customCategories.push(cat);
+  notify();
+  supabase.from('custom_categories').insert({
+    vault_id: vaultId(),
+    name: cat.name,
+    emoji: cat.emoji,
+    color: cat.color,
+  }).then(({ error }) => { if (error) console.error('addCustomCategory sync', error); });
+  return cache;
 }
 
 export function updateCustomCategory(oldName: string, cat: CustomCategory): BudgetData {
-  const data = load();
-  data.customCategories = data.customCategories.map(c => c.name === oldName ? cat : c);
-  // Also update entries that used the old name
+  cache.customCategories = cache.customCategories.map(c => c.name === oldName ? cat : c);
   if (oldName !== cat.name) {
-    data.entries = data.entries.map(e => e.category === oldName ? { ...e, category: cat.name } : e);
+    cache.entries = cache.entries.map(e => e.category === oldName ? { ...e, category: cat.name } : e);
   }
-  save(data);
-  return data;
+  notify();
+  const vid = vaultId();
+  supabase.from('custom_categories').update({
+    name: cat.name, emoji: cat.emoji, color: cat.color,
+  }).eq('vault_id', vid).eq('name', oldName)
+    .then(({ error }) => { if (error) console.error('updateCustomCategory sync', error); });
+  if (oldName !== cat.name) {
+    supabase.from('spend_entries').update({ category: cat.name })
+      .eq('vault_id', vid).eq('category', oldName)
+      .then(({ error }) => { if (error) console.error('rename entries sync', error); });
+  }
+  return cache;
 }
 
 export function deleteCustomCategory(name: string): BudgetData {
-  const data = load();
-  data.customCategories = data.customCategories.filter(c => c.name !== name);
-  save(data);
-  return data;
+  cache.customCategories = cache.customCategories.filter(c => c.name !== name);
+  notify();
+  supabase.from('custom_categories').delete()
+    .eq('vault_id', vaultId()).eq('name', name)
+    .then(({ error }) => { if (error) console.error('deleteCustomCategory sync', error); });
+  return cache;
+}
+
+// ---------- Migration: push existing localStorage data to new vault ----------
+const LEGACY_KEY = 'budget-tracker-data';
+
+export async function migrateLocalDataIfAny(): Promise<boolean> {
+  const raw = localStorage.getItem(LEGACY_KEY);
+  if (!raw) return false;
+  try {
+    const parsed: BudgetData = JSON.parse(raw);
+    const vid = getStoredVaultId();
+    if (!vid) return false;
+
+    if (parsed.customCategories?.length) {
+      await supabase.from('custom_categories').upsert(
+        parsed.customCategories.map(c => ({
+          vault_id: vid, name: c.name, emoji: c.emoji, color: c.color,
+        })),
+        { onConflict: 'vault_id,name' }
+      );
+    }
+    if (parsed.monthlyBudgets?.length) {
+      await supabase.from('monthly_budgets').upsert(
+        parsed.monthlyBudgets.map(b => ({
+          vault_id: vid, month: b.month, amount: b.amount,
+        })),
+        { onConflict: 'vault_id,month' }
+      );
+    }
+    if (parsed.categoryBudgets?.length) {
+      await supabase.from('category_budgets').upsert(
+        parsed.categoryBudgets.map(b => ({
+          vault_id: vid, category: b.category, month: b.month, amount: b.amount,
+        })),
+        { onConflict: 'vault_id,category,month' }
+      );
+    }
+    if (parsed.entries?.length) {
+      await supabase.from('spend_entries').upsert(
+        parsed.entries.map(e => ({
+          id: e.id,
+          vault_id: vid,
+          entry_date: e.date,
+          amount: e.amount,
+          category: e.category,
+        })),
+        { onConflict: 'id' }
+      );
+    }
+    localStorage.removeItem(LEGACY_KEY);
+    return true;
+  } catch (e) {
+    console.error('migrateLocalDataIfAny failed', e);
+    return false;
+  }
 }
