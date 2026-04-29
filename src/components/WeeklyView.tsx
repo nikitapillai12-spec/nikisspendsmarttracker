@@ -38,19 +38,20 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
   const weekTotal = weekEntries.reduce((s, e) => s + e.amount, 0);
   const budgetDiff = weeklyBudget ? weeklyBudget - weekTotal : null;
 
-  const handleAdd = useCallback((dateStr: string, amount: number, category: Category) => {
+  const handleAdd = useCallback((dateStr: string, amount: number, category: Category, note?: string) => {
     const entry: SpendEntry = {
       id: crypto.randomUUID(),
       amount,
       category,
       date: dateStr,
       createdAt: Date.now(),
+      note,
     };
     onDataChange(addEntry(entry));
   }, [onDataChange]);
 
-  const handleUpdate = useCallback((id: string, amount: number, category: Category) => {
-    onDataChange(updateEntry(id, { amount, category }));
+  const handleUpdate = useCallback((id: string, amount: number, category: Category, note?: string) => {
+    onDataChange(updateEntry(id, { amount, category, note }));
   }, [onDataChange]);
 
   const handleDelete = useCallback((id: string) => {
@@ -279,7 +280,7 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
                 dateStr={dateStr}
                 entries={dayEntries}
                 customCategories={data.customCategories}
-                onAdd={(amount, category) => handleAdd(dateStr, amount, category)}
+                onAdd={(amount, category, note) => handleAdd(dateStr, amount, category, note)}
                 onUpdate={handleUpdate}
                 onDelete={handleDelete}
               />
