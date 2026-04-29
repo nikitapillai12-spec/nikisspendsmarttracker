@@ -50,6 +50,7 @@ export async function initStore(): Promise<BudgetData> {
         category: r.category,
         date: r.entry_date,
         createdAt: new Date(r.created_at).getTime(),
+        note: (r as any).note ?? undefined,
       })),
       monthlyBudgets: (mbRes.data || []).map(r => ({
         month: r.month,
@@ -92,16 +93,18 @@ export function addEntry(entry: SpendEntry): BudgetData {
     entry_date: entry.date,
     amount: entry.amount,
     category: entry.category,
+    note: entry.note ?? null,
   }).then(({ error }) => { if (error) console.error('addEntry sync', error); });
   return cache;
 }
 
-export function updateEntry(id: string, updates: Partial<Pick<SpendEntry, 'amount' | 'category'>>): BudgetData {
+export function updateEntry(id: string, updates: Partial<Pick<SpendEntry, 'amount' | 'category' | 'note'>>): BudgetData {
   cache.entries = cache.entries.map(e => e.id === id ? { ...e, ...updates } : e);
   notify();
-  const patch: { amount?: number; category?: string } = {};
+  const patch: { amount?: number; category?: string; note?: string | null } = {};
   if (updates.amount !== undefined) patch.amount = updates.amount;
   if (updates.category !== undefined) patch.category = updates.category;
+  if (updates.note !== undefined) patch.note = updates.note ?? null;
   supabase.from('spend_entries').update(patch).eq('id', id)
     .then(({ error }) => { if (error) console.error('updateEntry sync', error); });
   return cache;
@@ -268,6 +271,7 @@ export async function migrateLocalDataIfAny(): Promise<boolean> {
           entry_date: e.date,
           amount: e.amount,
           category: e.category,
+          note: e.note ?? null,
         })),
         { onConflict: 'id' }
       );
