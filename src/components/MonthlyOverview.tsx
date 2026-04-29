@@ -71,7 +71,8 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
         .filter(ci => (ci.diff as number) >= 0)
         .sort((a, b) => (b.diff as number) - (a.diff as number))[0] || null;
 
-      // Aggregate spend by retailer (note) for each category, and overall
+      // Aggregate spend by retailer (note) for each category, and overall.
+      // We keep the FULL sorted list per category so tooltips can show every retailer.
       const topRetailersByCategory: Record<string, { note: string; total: number }[]> = {};
       const overallByRetailer: Record<string, number> = {};
       allCats.forEach(cat => {
@@ -85,14 +86,13 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
           });
         const sorted = Object.entries(byRetailer)
           .map(([note, total]) => ({ note, total }))
-          .sort((a, b) => b.total - a.total)
-          .slice(0, 3);
+          .sort((a, b) => b.total - a.total);
         if (sorted.length) topRetailersByCategory[cat] = sorted;
       });
       const topRetailersOverall = Object.entries(overallByRetailer)
         .map(([note, total]) => ({ note, total }))
         .sort((a, b) => b.total - a.total)
-        .slice(0, 3);
+        .slice(0, 5);
 
       return {
         month,
@@ -280,10 +280,10 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
                   </span>
                 </div>
                 {tops.length > 0 && (
-                  <ol className="ml-5 mt-0.5 text-[10px] text-muted-foreground space-y-0.5">
-                    {tops.map((r, i) => (
+                  <ol className="ml-5 mt-0.5 text-[10px] text-muted-foreground space-y-0.5 max-h-32 overflow-y-auto pr-1">
+                    {tops.map((r) => (
                       <li key={r.note} className="flex justify-between gap-2">
-                        <span className="truncate">{i + 1}. {r.note}</span>
+                        <span className="truncate">• {r.note}</span>
                         <span>£{r.total.toFixed(2)}</span>
                       </li>
                     ))}
