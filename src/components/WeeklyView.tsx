@@ -122,7 +122,7 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="icon" className="h-9 w-9 rounded-full" onClick={() => setWeekStart(navigateWeek(weekStart, 'prev'))}>
+          <Button variant="outline" size="icon" className="h-9 w-9 rounded-full border-2 border-foreground memphis-shadow-sm" onClick={() => setWeekStart(navigateWeek(weekStart, 'prev'))}>
             <ChevronLeft className="w-4 h-4" />
           </Button>
           <div className="text-center">
@@ -131,7 +131,7 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
             </h2>
             <p className="text-xs text-muted-foreground">{formatDisplayMonth(weekStart)}</p>
           </div>
-          <Button variant="outline" size="icon" className="h-9 w-9 rounded-full" onClick={() => setWeekStart(navigateWeek(weekStart, 'next'))}>
+          <Button variant="outline" size="icon" className="h-9 w-9 rounded-full border-2 border-foreground memphis-shadow-sm" onClick={() => setWeekStart(navigateWeek(weekStart, 'next'))}>
             <ChevronRight className="w-4 h-4" />
           </Button>
           <Button variant="ghost" size="sm" className="text-xs" onClick={() => setWeekStart(getWeekStart(new Date()))}>
@@ -144,7 +144,7 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
             key={weekTotal}
             initial={{ scale: 0.9 }}
             animate={{ scale: 1 }}
-            className="px-4 py-2 rounded-xl bg-secondary font-display"
+            className="px-4 py-2 rounded-xl bg-secondary font-display border-2 border-foreground memphis-shadow-sm"
           >
             <span className="text-xs text-muted-foreground">Week Total</span>
             <p className="font-bold text-lg">£{weekTotal.toFixed(2)}</p>
@@ -155,7 +155,7 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
               key={budgetDiff}
               initial={{ scale: 0.9 }}
               animate={{ scale: 1 }}
-              className={`px-4 py-2 rounded-xl font-display ${
+              className={`px-4 py-2 rounded-xl font-display border-2 border-foreground memphis-shadow-sm ${
                 budgetDiff >= 0
                   ? 'bg-budget-under/10 text-budget-under'
                   : 'bg-budget-over/10 text-budget-over'
@@ -172,7 +172,7 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
 
           <Dialog open={budgetDialogOpen} onOpenChange={(v) => { if (v) openBudgetDialog(); else setBudgetDialogOpen(false); }}>
             <DialogTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-1.5 rounded-full">
+              <Button variant="outline" size="sm" className="gap-1.5 rounded-full border-2 border-foreground memphis-shadow-sm">
                 <Target className="w-4 h-4" />
                 {currentBudget ? 'Edit Budget' : 'Set Budget'}
               </Button>
@@ -280,6 +280,7 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
                 dateStr={dateStr}
                 entries={dayEntries}
                 customCategories={data.customCategories}
+                allEntries={data.entries}
                 onAdd={(amount, category, note) => handleAdd(dateStr, amount, category, note)}
                 onUpdate={handleUpdate}
                 onDelete={handleDelete}

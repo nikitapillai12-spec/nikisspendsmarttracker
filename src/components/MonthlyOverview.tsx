@@ -71,7 +71,8 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
         .filter(ci => (ci.diff as number) >= 0)
         .sort((a, b) => (b.diff as number) - (a.diff as number))[0] || null;
 
-      // Aggregate spend by retailer (note) for each category, and overall
+      // Aggregate spend by retailer (note) for each category, and overall.
+      // We keep the FULL sorted list per category so tooltips can show every retailer.
       const topRetailersByCategory: Record<string, { note: string; total: number }[]> = {};
       const overallByRetailer: Record<string, number> = {};
       allCats.forEach(cat => {
@@ -85,14 +86,13 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
           });
         const sorted = Object.entries(byRetailer)
           .map(([note, total]) => ({ note, total }))
-          .sort((a, b) => b.total - a.total)
-          .slice(0, 3);
+          .sort((a, b) => b.total - a.total);
         if (sorted.length) topRetailersByCategory[cat] = sorted;
       });
       const topRetailersOverall = Object.entries(overallByRetailer)
         .map(([note, total]) => ({ note, total }))
         .sort((a, b) => b.total - a.total)
-        .slice(0, 3);
+        .slice(0, 5);
 
       return {
         month,
@@ -280,10 +280,10 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
                   </span>
                 </div>
                 {tops.length > 0 && (
-                  <ol className="ml-5 mt-0.5 text-[10px] text-muted-foreground space-y-0.5">
-                    {tops.map((r, i) => (
+                  <ol className="ml-5 mt-0.5 text-[10px] text-muted-foreground space-y-0.5 max-h-32 overflow-y-auto pr-1">
+                    {tops.map((r) => (
                       <li key={r.note} className="flex justify-between gap-2">
-                        <span className="truncate">{i + 1}. {r.note}</span>
+                        <span className="truncate">• {r.note}</span>
                         <span>£{r.total.toFixed(2)}</span>
                       </li>
                     ))}
@@ -304,10 +304,10 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className={`rounded-2xl p-6 text-center font-display ${
+          className={`rounded-2xl p-6 text-center font-display border-2 border-foreground memphis-shadow ${
             totalNetSavings >= 0
-              ? 'bg-budget-under/10 border-2 border-budget-under/30'
-              : 'bg-budget-over/10 border-2 border-budget-over/30'
+              ? 'bg-budget-under/15'
+              : 'bg-budget-over/15'
           }`}
         >
           <div className="flex items-center justify-center gap-2 mb-1">
@@ -332,7 +332,7 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-card rounded-2xl border border-border p-6 shadow-sm"
+          className="bg-card rounded-2xl border-2 border-foreground p-6 memphis-shadow"
         >
           <h3 className="font-display font-bold text-lg mb-1">Actual Spend vs Monthly Budget</h3>
           <p className="text-sm text-muted-foreground mb-4">Bars show actual spend, dashed line shows your monthly budget, solid line is your spend trend. Hover a bar for insights.</p>
@@ -379,10 +379,10 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: i * 0.05 }}
-                className={`rounded-xl p-3 text-center font-display ${
+                className={`rounded-xl p-3 text-center font-display border-2 border-foreground memphis-shadow-sm ${
                   d.isOver
-                    ? 'bg-budget-over/10 text-budget-over'
-                    : 'bg-budget-under/10 text-budget-under'
+                    ? 'bg-budget-over/15 text-budget-over'
+                    : 'bg-budget-under/15 text-budget-under'
                 }`}
               >
                 <p className="text-xs opacity-75">{d.month}</p>
@@ -401,7 +401,7 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="bg-card rounded-2xl border border-border p-6 shadow-sm"
+        className="bg-card rounded-2xl border-2 border-foreground p-6 memphis-shadow"
       >
         <h3 className="font-display font-bold text-lg mb-1">Monthly Spend Breakdown</h3>
         <p className="text-sm text-muted-foreground mb-4">Category composition with spend trend</p>
@@ -441,7 +441,7 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="bg-card rounded-2xl border border-border p-6 shadow-sm"
+          className="bg-card rounded-2xl border-2 border-foreground p-6 memphis-shadow"
         >
           <h3 className="font-display font-bold text-lg mb-1">Cumulative Savings Trend</h3>
           <p className="text-sm text-muted-foreground mb-4">Running total of savings vs overspend over time</p>

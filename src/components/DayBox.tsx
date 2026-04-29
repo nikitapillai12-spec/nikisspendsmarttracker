@@ -7,18 +7,21 @@ import { formatDisplayDate, isToday } from '@/lib/date-utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { RetailerInput } from './RetailerInput';
 
 interface DayBoxProps {
   date: Date;
   dateStr: string;
   entries: SpendEntry[];
   customCategories: CustomCategory[];
+  /** All entries across history — used to power retailer autocomplete suggestions. */
+  allEntries: SpendEntry[];
   onAdd: (amount: number, category: Category, note?: string) => void;
   onUpdate: (id: string, amount: number, category: Category, note?: string) => void;
   onDelete: (id: string) => void;
 }
 
-export function DayBox({ date, dateStr, entries, customCategories, onAdd, onUpdate, onDelete }: DayBoxProps) {
+export function DayBox({ date, dateStr, entries, customCategories, allEntries, onAdd, onUpdate, onDelete }: DayBoxProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [amount, setAmount] = useState('');
@@ -35,6 +38,41 @@ export function DayBox({ date, dateStr, entries, customCategories, onAdd, onUpda
       return acc;
     }, {})
   ).map(([name, value]) => ({ name, value }));
+
+  // Retailers per category for this day (for pie hover)
+  const retailersByCat: Record<string, { note: string; total: number }[]> = {};
+  for (const cat of pieData.map(p => p.name)) {
+    const totals = new Map<string, number>();
+    entries.filter(e => e.category === cat && e.note?.trim())
+      .forEach(e => totals.set(e.note!.trim(), (totals.get(e.note!.trim()) || 0) + e.amount));
+    const list = Array.from(totals.entries()).map(([note, total]) => ({ note, total }))
+      .sort((a, b) => b.total - a.total);
+    if (list.length) retailersByCat[cat] = list;
+  }
+
+  const PieTooltip = ({ active, payload }: any) => {
+    if (!active || !payload?.length) return null;
+    const { name, value } = payload[0];
+    const tops = retailersByCat[name] || [];
+    return (
+      <div className="rounded-lg bg-popover text-popover-foreground border-2 border-foreground shadow-[3px_3px_0_0_hsl(var(--foreground))] px-2.5 py-2 text-[11px] max-w-[180px]">
+        <div className="font-display font-bold flex justify-between gap-3">
+          <span>{getCategoryEmoji(name, customCategories)} {name}</span>
+          <span style={{ color: getCategoryColor(name, customCategories) }}>£{value.toFixed(2)}</span>
+        </div>
+        {tops.length > 0 && (
+          <ol className="mt-1 space-y-0.5">
+            {tops.map(r => (
+              <li key={r.note} className="flex justify-between gap-2">
+                <span className="truncate">• {r.note}</span>
+                <span className="font-semibold">£{r.total.toFixed(2)}</span>
+              </li>
+            ))}
+          </ol>
+        )}
+      </div>
+    );
+  };
 
   const handleAdd = () => {
     const val = parseFloat(amount);
@@ -70,10 +108,10 @@ export function DayBox({ date, dateStr, entries, customCategories, onAdd, onUpda
       layout
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`rounded-2xl border-2 p-4 transition-all ${
+      className={`rounded-2xl border-2 border-foreground p-4 transition-all bg-card shadow-[4px_4px_0_0_hsl(var(--foreground))] hover:shadow-[6px_6px_0_0_hsl(var(--foreground))] hover:-translate-y-0.5 ${
         today
-          ? 'border-primary bg-primary/5 shadow-lg shadow-primary/10'
-          : 'border-border bg-card hover:border-primary/30 hover:shadow-md'
+          ? 'bg-primary/10'
+          : ''
       }`}
     >
       <div className="flex items-center justify-between mb-3">
@@ -111,16 +149,13 @@ export function DayBox({ date, dateStr, entries, customCategories, onAdd, onUpda
                 outerRadius={45}
                 innerRadius={25}
                 strokeWidth={2}
-                stroke="hsl(var(--card))"
+                stroke="hsl(var(--foreground))"
               >
                 {pieData.map((entry) => (
                   <Cell key={entry.name} fill={getCategoryColor(entry.name, customCategories)} />
                 ))}
               </Pie>
-              <Tooltip
-                formatter={(value: number) => `£${value.toFixed(2)}`}
-                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 16px rgba(0,0,0,0.1)', fontSize: '12px' }}
-              />
+              <Tooltip content={<PieTooltip />} />
             </PieChart>
           </ResponsiveContainer>
         </div>
@@ -144,7 +179,13 @@ export function DayBox({ date, dateStr, entries, customCategories, onAdd, onUpda
                       </SelectContent>
                     </Select>
                   </div>
-                  <Input value={note} onChange={(e) => setNote(e.target.value)} className="h-7 text-xs" placeholder="Shop / retailer (optional)" />
+                  <RetailerInput
+                    value={note}
+                    onChange={setNote}
+                    entries={allEntries}
+                    category={category}
+                    className="h-7 text-xs"
+                  />
                   <div className="flex gap-1">
                     <Button size="sm" className="h-6 text-xs px-2" onClick={() => handleUpdate(entry.id)}><Check className="w-3 h-3" /></Button>
                     <Button size="sm" variant="ghost" className="h-6 text-xs px-2" onClick={() => setEditingId(null)}><X className="w-3 h-3" /></Button>
@@ -153,10 +194,10 @@ export function DayBox({ date, dateStr, entries, customCategories, onAdd, onUpda
               ) : (
                 <>
                   <span className="shrink-0">{getCategoryEmoji(entry.category, customCategories)}</span>
-                  <div className="truncate flex-1 min-w-0">
-                    <div className="truncate text-muted-foreground">{entry.category}</div>
+                  <div className="truncate flex-1 min-w-0 text-muted-foreground" title={entry.note ? `${entry.category} (${entry.note})` : entry.category}>
+                    {entry.category}
                     {entry.note && (
-                      <div className="truncate text-[10px] text-foreground/70 italic" title={entry.note}>@ {entry.note}</div>
+                      <span className="text-foreground/80 font-medium"> ({entry.note})</span>
                     )}
                   </div>
                   <span className="font-semibold">£{entry.amount.toFixed(2)}</span>
@@ -183,7 +224,14 @@ export function DayBox({ date, dateStr, entries, customCategories, onAdd, onUpda
                   ))}
                 </SelectContent>
               </Select>
-              <Input value={note} onChange={(e) => setNote(e.target.value)} className="h-8 text-sm" placeholder="Shop / retailer (optional)" onKeyDown={(e) => e.key === 'Enter' && handleAdd()} />
+              <RetailerInput
+                value={note}
+                onChange={setNote}
+                entries={allEntries}
+                category={category}
+                className="h-8 text-sm"
+                onEnter={handleAdd}
+              />
               <div className="flex gap-1.5">
                 <Button size="sm" className="flex-1 h-7" onClick={handleAdd}>Add</Button>
                 <Button size="sm" variant="ghost" className="h-7" onClick={() => { setIsAdding(false); setAmount(''); setNote(''); }}>Cancel</Button>
@@ -197,7 +245,7 @@ export function DayBox({ date, dateStr, entries, customCategories, onAdd, onUpda
         <Button
           variant="outline"
           size="sm"
-          className="w-full h-8 text-xs border-dashed hover:border-primary hover:text-primary hover:bg-primary/5 transition-all"
+          className="w-full h-8 text-xs border-2 border-dashed border-foreground/40 hover:border-primary hover:text-primary hover:bg-primary/10 transition-all"
           onClick={() => setIsAdding(true)}
         >
           <Plus className="w-3.5 h-3.5 mr-1" />
