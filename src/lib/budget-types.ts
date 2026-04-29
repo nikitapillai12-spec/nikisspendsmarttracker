@@ -67,6 +67,7 @@ export interface SpendEntry {
   category: Category;
   date: string; // YYYY-MM-DD
   createdAt: number;
+  note?: string; // shop / retailer / website
 }
 
 export interface MonthlyBudget {

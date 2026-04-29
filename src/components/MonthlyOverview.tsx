@@ -31,6 +31,8 @@ interface MonthInsight {
   categoryInsights: CategoryInsight[];
   worstOver: CategoryInsight | null;
   bestUnder: CategoryInsight | null;
+  topRetailersByCategory: Record<string, { note: string; total: number }[]>;
+  topRetailersOverall: { note: string; total: number }[];
 }
 
 export function MonthlyOverview({ data }: MonthlyOverviewProps) {
@@ -69,6 +71,29 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
         .filter(ci => (ci.diff as number) >= 0)
         .sort((a, b) => (b.diff as number) - (a.diff as number))[0] || null;
 
+      // Aggregate spend by retailer (note) for each category, and overall
+      const topRetailersByCategory: Record<string, { note: string; total: number }[]> = {};
+      const overallByRetailer: Record<string, number> = {};
+      allCats.forEach(cat => {
+        const byRetailer: Record<string, number> = {};
+        entries
+          .filter(e => e.category === cat && e.note && e.note.trim())
+          .forEach(e => {
+            const key = (e.note as string).trim();
+            byRetailer[key] = (byRetailer[key] || 0) + e.amount;
+            overallByRetailer[key] = (overallByRetailer[key] || 0) + e.amount;
+          });
+        const sorted = Object.entries(byRetailer)
+          .map(([note, total]) => ({ note, total }))
+          .sort((a, b) => b.total - a.total)
+          .slice(0, 3);
+        if (sorted.length) topRetailersByCategory[cat] = sorted;
+      });
+      const topRetailersOverall = Object.entries(overallByRetailer)
+        .map(([note, total]) => ({ note, total }))
+        .sort((a, b) => b.total - a.total)
+        .slice(0, 3);
+
       return {
         month,
         displayMonth,
@@ -79,6 +104,8 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
         categoryInsights,
         worstOver,
         bestUnder,
+        topRetailersByCategory,
+        topRetailersOverall,
       };
     });
   }, [months, data, allCats]);
@@ -87,6 +114,7 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
   const stackedData = useMemo(() => {
     return monthlyData.map(d => ({
       displayMonth: d.displayMonth,
+      monthKey: d.month,
       total: d.total,
       ...d.byCategory,
     }));
@@ -202,11 +230,69 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
           </div>
         )}
 
+        {insight.topRetailersOverall.length > 0 && (
+          <div className="border-t border-border pt-2 mt-2">
+            <div className="text-muted-foreground mb-1">🏷️ Top retailers this month</div>
+            <ol className="space-y-0.5">
+              {insight.topRetailersOverall.map((r, i) => (
+                <li key={r.note} className="flex justify-between gap-3">
+                  <span className="truncate">{i + 1}. {r.note}</span>
+                  <span className="font-semibold">£{r.total.toFixed(2)}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        )}
+
         {insight.categoryInsights.filter(c => c.budget === null && c.spent > 0).length > 0 && (
           <div className="mt-2 pt-2 border-t border-border text-muted-foreground text-[10px]">
             Tip: set per-category budgets to see more insights.
           </div>
         )}
+      </div>
+    );
+  };
+
+  // Custom tooltip for stacked breakdown — shows category breakdown + top retailers per category for that month
+  const StackedTooltip = ({ active, payload, label }: any) => {
+    if (!active || !payload || !payload.length) return null;
+    const monthKey = payload[0]?.payload?.monthKey;
+    const insight = monthKey ? insightByMonth[monthKey] : null;
+    if (!insight) return null;
+    // Categories with spend, sorted desc
+    const cats = Object.entries(insight.byCategory)
+      .filter(([, v]) => v > 0)
+      .sort((a, b) => (b[1] as number) - (a[1] as number));
+    return (
+      <div className="rounded-xl bg-popover text-popover-foreground border border-border shadow-xl p-3 text-xs max-w-xs">
+        <div className="font-display font-bold text-sm mb-2">{label} · £{insight.total.toFixed(2)}</div>
+        <div className="space-y-2">
+          {cats.map(([cat, amt]) => {
+            const tops = insight.topRetailersByCategory[cat] || [];
+            return (
+              <div key={cat}>
+                <div className="flex justify-between gap-3">
+                  <span className="font-semibold">
+                    {getCategoryEmoji(cat, customCats)} {cat}
+                  </span>
+                  <span className="font-semibold" style={{ color: getCategoryColor(cat, customCats) }}>
+                    £{(amt as number).toFixed(2)}
+                  </span>
+                </div>
+                {tops.length > 0 && (
+                  <ol className="ml-5 mt-0.5 text-[10px] text-muted-foreground space-y-0.5">
+                    {tops.map((r, i) => (
+                      <li key={r.note} className="flex justify-between gap-2">
+                        <span className="truncate">{i + 1}. {r.note}</span>
+                        <span>£{r.total.toFixed(2)}</span>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
     );
   };
@@ -325,10 +411,7 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis dataKey="displayMonth" tick={{ fontSize: 12 }} />
               <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `£${v}`} />
-              <Tooltip
-                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', fontSize: '13px' }}
-                formatter={(value: number, name: string) => [`£${value.toFixed(2)}`, name]}
-              />
+              <Tooltip content={<StackedTooltip />} cursor={{ fill: 'hsl(var(--accent) / 0.08)' }} />
               <Legend wrapperStyle={{ fontSize: '11px' }} />
               {activeCategories.map((cat) => (
                 <Bar

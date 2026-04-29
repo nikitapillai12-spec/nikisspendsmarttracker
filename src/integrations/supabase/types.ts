@@ -117,6 +117,7 @@ export type Database = {
           created_at: string
           entry_date: string
           id: string
+          note: string | null
           vault_id: string
         }
         Insert: {
@@ -125,6 +126,7 @@ export type Database = {
           created_at?: string
           entry_date: string
           id?: string
+          note?: string | null
           vault_id: string
         }
         Update: {
@@ -133,6 +135,7 @@ export type Database = {
           created_at?: string
           entry_date?: string
           id?: string
+          note?: string | null
           vault_id?: string
         }
         Relationships: [

@@ -1,0 +1,1 @@
+ALTER TABLE public.spend_entries ADD COLUMN IF NOT EXISTS note TEXT;
