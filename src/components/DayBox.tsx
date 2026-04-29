@@ -13,8 +13,8 @@ interface DayBoxProps {
   dateStr: string;
   entries: SpendEntry[];
   customCategories: CustomCategory[];
-  onAdd: (amount: number, category: Category) => void;
-  onUpdate: (id: string, amount: number, category: Category) => void;
+  onAdd: (amount: number, category: Category, note?: string) => void;
+  onUpdate: (id: string, amount: number, category: Category, note?: string) => void;
   onDelete: (id: string) => void;
 }
 
@@ -23,6 +23,7 @@ export function DayBox({ date, dateStr, entries, customCategories, onAdd, onUpda
   const [editingId, setEditingId] = useState<string | null>(null);
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState<Category>('Groceries');
+  const [note, setNote] = useState('');
 
   const total = entries.reduce((s, e) => s + e.amount, 0);
   const today = isToday(date);
@@ -38,9 +39,10 @@ export function DayBox({ date, dateStr, entries, customCategories, onAdd, onUpda
   const handleAdd = () => {
     const val = parseFloat(amount);
     if (val > 0) {
-      onAdd(val, category);
+      onAdd(val, category, note.trim() || undefined);
       setAmount('');
       setCategory('Groceries');
+      setNote('');
       setIsAdding(false);
     }
   };
@@ -48,9 +50,10 @@ export function DayBox({ date, dateStr, entries, customCategories, onAdd, onUpda
   const handleUpdate = (id: string) => {
     const val = parseFloat(amount);
     if (val > 0) {
-      onUpdate(id, val, category);
+      onUpdate(id, val, category, note.trim() || undefined);
       setEditingId(null);
       setAmount('');
+      setNote('');
     }
   };
 
@@ -58,6 +61,7 @@ export function DayBox({ date, dateStr, entries, customCategories, onAdd, onUpda
     setEditingId(entry.id);
     setAmount(entry.amount.toString());
     setCategory(entry.category);
+    setNote(entry.note || '');
     setIsAdding(false);
   };
 
@@ -140,6 +144,7 @@ export function DayBox({ date, dateStr, entries, customCategories, onAdd, onUpda
                       </SelectContent>
                     </Select>
                   </div>
+                  <Input value={note} onChange={(e) => setNote(e.target.value)} className="h-7 text-xs" placeholder="Shop / retailer (optional)" />
                   <div className="flex gap-1">
                     <Button size="sm" className="h-6 text-xs px-2" onClick={() => handleUpdate(entry.id)}><Check className="w-3 h-3" /></Button>
                     <Button size="sm" variant="ghost" className="h-6 text-xs px-2" onClick={() => setEditingId(null)}><X className="w-3 h-3" /></Button>
@@ -148,7 +153,12 @@ export function DayBox({ date, dateStr, entries, customCategories, onAdd, onUpda
               ) : (
                 <>
                   <span className="shrink-0">{getCategoryEmoji(entry.category, customCategories)}</span>
-                  <span className="truncate flex-1 text-muted-foreground">{entry.category}</span>
+                  <div className="truncate flex-1 min-w-0">
+                    <div className="truncate text-muted-foreground">{entry.category}</div>
+                    {entry.note && (
+                      <div className="truncate text-[10px] text-foreground/70 italic" title={entry.note}>@ {entry.note}</div>
+                    )}
+                  </div>
                   <span className="font-semibold">£{entry.amount.toFixed(2)}</span>
                   <button onClick={() => startEdit(entry)} className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"><Pencil className="w-3 h-3" /></button>
                   <button onClick={() => onDelete(entry.id)} className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"><Trash2 className="w-3 h-3" /></button>
@@ -173,9 +183,10 @@ export function DayBox({ date, dateStr, entries, customCategories, onAdd, onUpda
                   ))}
                 </SelectContent>
               </Select>
+              <Input value={note} onChange={(e) => setNote(e.target.value)} className="h-8 text-sm" placeholder="Shop / retailer (optional)" onKeyDown={(e) => e.key === 'Enter' && handleAdd()} />
               <div className="flex gap-1.5">
                 <Button size="sm" className="flex-1 h-7" onClick={handleAdd}>Add</Button>
-                <Button size="sm" variant="ghost" className="h-7" onClick={() => { setIsAdding(false); setAmount(''); }}>Cancel</Button>
+                <Button size="sm" variant="ghost" className="h-7" onClick={() => { setIsAdding(false); setAmount(''); setNote(''); }}>Cancel</Button>
               </div>
             </div>
           </motion.div>
