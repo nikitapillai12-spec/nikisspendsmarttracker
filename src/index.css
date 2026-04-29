@@ -120,4 +120,65 @@
   .gradient-fun {
     background: linear-gradient(135deg, hsl(45 90% 55%), hsl(340 75% 55%), hsl(250 70% 62%));
   }
+
+  /* ---------- Memphis design system ---------- */
+  /* Hard, offset "neo-brutalist Memphis" shadow */
+  .memphis-shadow {
+    box-shadow: 5px 5px 0 0 hsl(var(--foreground));
+  }
+  .memphis-shadow-sm {
+    box-shadow: 3px 3px 0 0 hsl(var(--foreground));
+  }
+  .memphis-card {
+    border: 2px solid hsl(var(--foreground));
+    box-shadow: 5px 5px 0 0 hsl(var(--foreground));
+    background: hsl(var(--card));
+  }
+
+  /* Confetti background — dots, squiggles, zigzags, triangles */
+  .memphis-bg {
+    background-color: hsl(var(--background));
+    background-image:
+      /* pink dots */
+      radial-gradient(hsl(340 75% 55% / 0.55) 2px, transparent 2.5px),
+      /* teal dots offset */
+      radial-gradient(hsl(160 60% 45% / 0.45) 1.5px, transparent 2px),
+      /* yellow squiggle */
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='80' height='40' viewBox='0 0 80 40'><path d='M0 20 Q 10 0, 20 20 T 40 20 T 60 20 T 80 20' stroke='%23F5C518' stroke-width='3' fill='none' stroke-linecap='round'/></svg>"),
+      /* coral triangle */
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'><polygon points='20,4 36,34 4,34' fill='none' stroke='%23E94E3B' stroke-width='2.5'/></svg>"),
+      /* purple zigzag */
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='60' height='30' viewBox='0 0 60 30'><polyline points='0,15 10,5 20,15 30,5 40,15 50,5 60,15' stroke='%237C3AED' stroke-width='2.5' fill='none' stroke-linejoin='round'/></svg>");
+    background-size:
+      28px 28px,
+      28px 28px,
+      160px 80px,
+      120px 120px,
+      180px 90px;
+    background-position:
+      0 0,
+      14px 14px,
+      40px 60px,
+      200px 200px,
+      120px 320px;
+    background-repeat: repeat, repeat, repeat, repeat, repeat;
+  }
+
+  /* Outline used for chart cards & headers */
+  .memphis-outline {
+    border: 2px solid hsl(var(--foreground));
+  }
+
+  .memphis-pill {
+    border: 2px solid hsl(var(--foreground));
+    box-shadow: 3px 3px 0 0 hsl(var(--foreground));
+    border-radius: 9999px;
+  }
+
+  /* Floating decorative shapes */
+  .memphis-blob {
+    position: absolute;
+    pointer-events: none;
+    z-index: 0;
+  }
 }
