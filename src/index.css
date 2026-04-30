@@ -2,52 +2,57 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Poppins:wght@300;400;500;600;700&family=Lora:ital,wght@0,400;0,500;0,600;1,400&display=swap');
 
 @layer base {
   :root {
-    --background: 40 40% 96%;
-    --foreground: 340 20% 15%;
+    /* Mid-century modern palette: cream, mustard, teal, terracotta, olive, charcoal */
+    --background: 38 35% 92%;        /* warm cream */
+    --foreground: 25 25% 15%;        /* deep charcoal-brown */
 
-    --card: 40 50% 99%;
-    --card-foreground: 340 20% 15%;
+    --card: 36 45% 96%;              /* lighter cream */
+    --card-foreground: 25 25% 15%;
 
-    --popover: 40 50% 99%;
-    --popover-foreground: 340 20% 15%;
+    --popover: 36 45% 96%;
+    --popover-foreground: 25 25% 15%;
 
-    --primary: 340 75% 55%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 15 65% 48%;           /* terracotta */
+    --primary-foreground: 38 40% 96%;
 
-    --secondary: 45 60% 92%;
-    --secondary-foreground: 340 20% 20%;
+    --secondary: 42 50% 86%;         /* warm sand */
+    --secondary-foreground: 25 25% 18%;
 
-    --muted: 40 30% 90%;
-    --muted-foreground: 340 10% 45%;
+    --muted: 38 25% 84%;
+    --muted-foreground: 25 12% 38%;
 
-    --accent: 160 60% 45%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 180 35% 38%;           /* dusty teal */
+    --accent-foreground: 38 40% 96%;
 
-    --destructive: 0 75% 55%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive: 5 60% 45%;
+    --destructive-foreground: 38 40% 96%;
 
-    --border: 40 25% 85%;
-    --input: 40 25% 85%;
-    --ring: 340 75% 55%;
+    --border: 30 20% 78%;
+    --input: 30 20% 78%;
+    --ring: 15 65% 48%;
 
-    --radius: 0.75rem;
+    --radius: 0.5rem;
 
     /* Budget colors */
-    --budget-under: 145 70% 42%;
-    --budget-over: 0 75% 55%;
-    --budget-warning: 40 90% 50%;
+    --budget-under: 90 35% 38%;      /* olive green */
+    --budget-over: 5 60% 48%;        /* burnt sienna */
+    --budget-warning: 38 75% 50%;    /* mustard */
 
-    /* Fun gradient accents */
-    --gradient-warm: linear-gradient(135deg, hsl(340 75% 55%), hsl(25 95% 58%));
-    --gradient-cool: linear-gradient(135deg, hsl(160 60% 45%), hsl(210 80% 58%));
+    /* Mid-century accent colors */
+    --mcm-mustard: 42 80% 55%;
+    --mcm-teal: 180 35% 38%;
+    --mcm-terracotta: 15 65% 48%;
+    --mcm-olive: 90 35% 38%;
+    --mcm-cream: 38 45% 90%;
 
-    /* Fonts */
-    --font-display: 'Space Grotesk', sans-serif;
-    --font-body: 'DM Sans', sans-serif;
+    /* Fonts: Bebas Neue display (geometric, mcm signage), Poppins body (clean geometric sans) */
+    --font-display: 'Bebas Neue', 'Poppins', sans-serif;
+    --font-body: 'Poppins', sans-serif;
+    --font-serif: 'Lora', Georgia, serif;
 
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
@@ -60,25 +65,25 @@
   }
 
   .dark {
-    --background: 340 20% 8%;
-    --foreground: 40 30% 90%;
-    --card: 340 20% 12%;
-    --card-foreground: 40 30% 90%;
-    --popover: 340 20% 12%;
-    --popover-foreground: 40 30% 90%;
-    --primary: 340 75% 60%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 340 15% 18%;
-    --secondary-foreground: 40 30% 85%;
-    --muted: 340 10% 18%;
-    --muted-foreground: 340 10% 55%;
-    --accent: 160 60% 45%;
-    --accent-foreground: 0 0% 100%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 340 10% 20%;
-    --input: 340 10% 20%;
-    --ring: 340 75% 60%;
+    --background: 25 18% 10%;
+    --foreground: 38 35% 88%;
+    --card: 25 18% 14%;
+    --card-foreground: 38 35% 88%;
+    --popover: 25 18% 14%;
+    --popover-foreground: 38 35% 88%;
+    --primary: 15 65% 55%;
+    --primary-foreground: 38 40% 96%;
+    --secondary: 25 12% 22%;
+    --secondary-foreground: 38 30% 85%;
+    --muted: 25 10% 22%;
+    --muted-foreground: 38 15% 60%;
+    --accent: 180 35% 45%;
+    --accent-foreground: 38 40% 96%;
+    --destructive: 5 55% 45%;
+    --destructive-foreground: 38 40% 96%;
+    --border: 25 12% 24%;
+    --input: 25 12% 24%;
+    --ring: 15 65% 55%;
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;
@@ -97,10 +102,13 @@
 
   body {
     @apply bg-background text-foreground font-body;
+    font-size: 16px;
+    line-height: 1.55;
   }
 
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-display);
+    letter-spacing: 0.02em;
   }
 }
 
@@ -111,74 +119,89 @@
   .font-body {
     font-family: var(--font-body);
   }
+  .font-serif-mcm {
+    font-family: var(--font-serif);
+  }
   .gradient-warm {
-    background: linear-gradient(135deg, hsl(340 75% 55%), hsl(25 95% 58%));
+    background: linear-gradient(135deg, hsl(15 65% 48%), hsl(42 80% 55%));
   }
   .gradient-cool {
-    background: linear-gradient(135deg, hsl(160 60% 45%), hsl(210 80% 58%));
+    background: linear-gradient(135deg, hsl(180 35% 38%), hsl(90 35% 38%));
   }
   .gradient-fun {
-    background: linear-gradient(135deg, hsl(45 90% 55%), hsl(340 75% 55%), hsl(250 70% 62%));
+    background: linear-gradient(135deg, hsl(42 80% 55%), hsl(15 65% 48%), hsl(180 35% 38%));
   }
 
-  /* ---------- Memphis design system ---------- */
-  /* Hard, offset "neo-brutalist Memphis" shadow */
-  .memphis-shadow {
-    box-shadow: 5px 5px 0 0 hsl(var(--foreground));
+  /* ---------- Mid-Century Modern design system ---------- */
+  /* Soft, layered shadow — restrained, atelier-feel (not hard offset) */
+  .mcm-shadow {
+    box-shadow:
+      0 1px 0 0 hsl(var(--border)),
+      0 8px 20px -10px hsl(25 25% 15% / 0.18);
   }
-  .memphis-shadow-sm {
-    box-shadow: 3px 3px 0 0 hsl(var(--foreground));
+  .mcm-shadow-sm {
+    box-shadow:
+      0 1px 0 0 hsl(var(--border)),
+      0 4px 10px -6px hsl(25 25% 15% / 0.16);
   }
-  .memphis-card {
-    border: 2px solid hsl(var(--foreground));
-    box-shadow: 5px 5px 0 0 hsl(var(--foreground));
+  .mcm-card {
+    border: 1px solid hsl(var(--border));
+    background: hsl(var(--card));
+    border-radius: var(--radius);
+    box-shadow:
+      0 1px 0 0 hsl(var(--border)),
+      0 8px 20px -10px hsl(25 25% 15% / 0.18);
+  }
+
+  /* Cream paper background with subtle MCM geometric motifs:
+     atomic dots, organic kidney curves, starburst rays — sparse and refined */
+  .mcm-bg {
+    background-color: hsl(var(--background));
+    background-image:
+      /* sparse mustard atomic dots */
+      radial-gradient(hsl(42 80% 55% / 0.18) 1.5px, transparent 2px),
+      /* teal arcs */
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220' viewBox='0 0 220 220'><path d='M30 180 Q 110 30, 190 180' stroke='%23416B6B' stroke-width='1.4' fill='none' stroke-linecap='round' opacity='0.22'/></svg>"),
+      /* terracotta starburst */
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180' viewBox='0 0 180 180'><g stroke='%23B0532C' stroke-width='1.2' opacity='0.22' stroke-linecap='round'><line x1='90' y1='40' x2='90' y2='10'/><line x1='90' y1='170' x2='90' y2='140'/><line x1='40' y1='90' x2='10' y2='90'/><line x1='170' y1='90' x2='140' y2='90'/><line x1='55' y1='55' x2='35' y2='35'/><line x1='125' y1='55' x2='145' y2='35'/><line x1='55' y1='125' x2='35' y2='145'/><line x1='125' y1='125' x2='145' y2='145'/><circle cx='90' cy='90' r='8' fill='none'/></g></svg>"),
+      /* olive kidney shape */
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='160' viewBox='0 0 240 160'><path d='M40 80 C 40 30, 110 30, 130 70 C 145 100, 200 90, 200 110 C 200 140, 130 150, 90 130 C 50 115, 40 110, 40 80 Z' fill='none' stroke='%23708248' stroke-width='1.3' opacity='0.2'/></svg>");
+    background-size:
+      40px 40px,
+      260px 260px,
+      220px 220px,
+      300px 200px;
+    background-position:
+      0 0,
+      40px 80px,
+      300px 320px,
+      180px 600px;
+    background-repeat: repeat, repeat, repeat, repeat;
+  }
+
+  .mcm-outline {
+    border: 1px solid hsl(var(--border));
+  }
+
+  .mcm-pill {
+    border: 1px solid hsl(var(--border));
+    border-radius: 9999px;
     background: hsl(var(--card));
   }
 
-  /* Confetti background — dots, squiggles, zigzags, triangles */
-  .memphis-bg {
-    background-color: hsl(var(--background));
-    background-image:
-      /* pink dots */
-      radial-gradient(hsl(340 75% 55% / 0.55) 2px, transparent 2.5px),
-      /* teal dots offset */
-      radial-gradient(hsl(160 60% 45% / 0.45) 1.5px, transparent 2px),
-      /* yellow squiggle */
-      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='80' height='40' viewBox='0 0 80 40'><path d='M0 20 Q 10 0, 20 20 T 40 20 T 60 20 T 80 20' stroke='%23F5C518' stroke-width='3' fill='none' stroke-linecap='round'/></svg>"),
-      /* coral triangle */
-      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'><polygon points='20,4 36,34 4,34' fill='none' stroke='%23E94E3B' stroke-width='2.5'/></svg>"),
-      /* purple zigzag */
-      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='60' height='30' viewBox='0 0 60 30'><polyline points='0,15 10,5 20,15 30,5 40,15 50,5 60,15' stroke='%237C3AED' stroke-width='2.5' fill='none' stroke-linejoin='round'/></svg>");
-    background-size:
-      28px 28px,
-      28px 28px,
-      160px 80px,
-      120px 120px,
-      180px 90px;
-    background-position:
-      0 0,
-      14px 14px,
-      40px 60px,
-      200px 200px,
-      120px 320px;
-    background-repeat: repeat, repeat, repeat, repeat, repeat;
-  }
-
-  /* Outline used for chart cards & headers */
-  .memphis-outline {
-    border: 2px solid hsl(var(--foreground));
-  }
-
-  .memphis-pill {
-    border: 2px solid hsl(var(--foreground));
-    box-shadow: 3px 3px 0 0 hsl(var(--foreground));
-    border-radius: 9999px;
-  }
-
-  /* Floating decorative shapes */
-  .memphis-blob {
+  .mcm-blob {
     position: absolute;
     pointer-events: none;
     z-index: 0;
   }
+
+  /* Backwards-compat: alias old memphis-* classes to new mcm-* so any leftover
+     usages still get a reasonable mid-century look without breaking layout. */
+  .memphis-shadow { box-shadow: 0 1px 0 0 hsl(var(--border)), 0 8px 20px -10px hsl(25 25% 15% / 0.18); }
+  .memphis-shadow-sm { box-shadow: 0 1px 0 0 hsl(var(--border)), 0 4px 10px -6px hsl(25 25% 15% / 0.16); }
+  .memphis-card { border: 1px solid hsl(var(--border)); background: hsl(var(--card)); border-radius: var(--radius); }
+  .memphis-outline { border: 1px solid hsl(var(--border)); }
+  .memphis-pill { border: 1px solid hsl(var(--border)); border-radius: 9999px; }
+  .memphis-blob { position: absolute; pointer-events: none; z-index: 0; }
+  .memphis-bg { background-color: hsl(var(--background)); }
 }
