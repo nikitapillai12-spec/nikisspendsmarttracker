@@ -108,7 +108,7 @@ export function DayBox({ date, dateStr, entries, customCategories, allEntries, o
       layout
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`rounded-2xl border-2 border-foreground p-4 transition-all bg-card shadow-[4px_4px_0_0_hsl(var(--foreground))] hover:shadow-[6px_6px_0_0_hsl(var(--foreground))] hover:-translate-y-0.5 ${
+      className={`rounded-xl border border-border p-4 transition-all bg-card mcm-shadow hover:-translate-y-0.5 ${
         today
           ? 'bg-primary/10'
           : ''
@@ -116,11 +116,11 @@ export function DayBox({ date, dateStr, entries, customCategories, allEntries, o
     >
       <div className="flex items-center justify-between mb-3">
         <div>
-          <h3 className="font-display font-semibold text-sm">
+          <h3 className="font-display font-normal text-lg tracking-wide leading-none">
             {formatDisplayDate(date)}
           </h3>
           {today && (
-            <span className="text-xs font-bold text-primary animate-pulse">✨ Today</span>
+            <span className="text-sm font-semibold text-primary font-serif-mcm italic">✦ Today</span>
           )}
         </div>
         {total > 0 && (
@@ -128,7 +128,7 @@ export function DayBox({ date, dateStr, entries, customCategories, allEntries, o
             key={total}
             initial={{ scale: 0.8 }}
             animate={{ scale: 1 }}
-            className="font-display font-bold text-lg text-primary"
+            className="font-display font-normal text-2xl text-primary tracking-wide"
           >
             £{total.toFixed(2)}
           </motion.span>
@@ -137,7 +137,7 @@ export function DayBox({ date, dateStr, entries, customCategories, allEntries, o
 
       {/* Pie Chart */}
       {pieData.length > 0 && (
-        <div className="h-28 mb-2">
+        <div className="h-44 mb-3">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
@@ -146,10 +146,10 @@ export function DayBox({ date, dateStr, entries, customCategories, allEntries, o
                 nameKey="name"
                 cx="50%"
                 cy="50%"
-                outerRadius={45}
-                innerRadius={25}
-                strokeWidth={2}
-                stroke="hsl(var(--foreground))"
+                outerRadius="92%"
+                innerRadius="55%"
+                strokeWidth={1.5}
+                stroke="hsl(var(--card))"
               >
                 {pieData.map((entry) => (
                   <Cell key={entry.name} fill={getCategoryColor(entry.name, customCategories)} />
@@ -162,19 +162,19 @@ export function DayBox({ date, dateStr, entries, customCategories, allEntries, o
       )}
 
       {/* Entries List */}
-      <div className="space-y-1.5 mb-3 max-h-40 overflow-y-auto">
+      <div className="space-y-2 mb-3 max-h-40 overflow-y-auto">
         <AnimatePresence>
           {entries.map((entry) => (
-            <motion.div key={entry.id} layout initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} className="flex items-center gap-1.5 text-xs group">
+            <motion.div key={entry.id} layout initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} className="flex items-center gap-1.5 text-sm group">
               {editingId === entry.id ? (
                 <div className="flex flex-col gap-1.5 w-full">
                   <div className="flex gap-1.5">
-                    <Input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} className="h-7 text-xs flex-1" placeholder="£" />
+                    <Input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} className="h-8 text-sm flex-1" placeholder="£" />
                     <Select value={category} onValueChange={(v) => setCategory(v)}>
-                      <SelectTrigger className="h-7 text-xs flex-1"><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="h-8 text-sm flex-1"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         {allCategories.map((c) => (
-                          <SelectItem key={c} value={c} className="text-xs">{getCategoryEmoji(c, customCategories)} {c}</SelectItem>
+                          <SelectItem key={c} value={c} className="text-sm">{getCategoryEmoji(c, customCategories)} {c}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -184,25 +184,25 @@ export function DayBox({ date, dateStr, entries, customCategories, allEntries, o
                     onChange={setNote}
                     entries={allEntries}
                     category={category}
-                    className="h-7 text-xs"
+                    className="h-8 text-sm"
                   />
                   <div className="flex gap-1">
-                    <Button size="sm" className="h-6 text-xs px-2" onClick={() => handleUpdate(entry.id)}><Check className="w-3 h-3" /></Button>
-                    <Button size="sm" variant="ghost" className="h-6 text-xs px-2" onClick={() => setEditingId(null)}><X className="w-3 h-3" /></Button>
+                    <Button size="sm" className="h-7 text-sm px-2" onClick={() => handleUpdate(entry.id)}><Check className="w-3.5 h-3.5" /></Button>
+                    <Button size="sm" variant="ghost" className="h-7 text-sm px-2" onClick={() => setEditingId(null)}><X className="w-3.5 h-3.5" /></Button>
                   </div>
                 </div>
               ) : (
                 <>
                   <span className="shrink-0">{getCategoryEmoji(entry.category, customCategories)}</span>
-                  <div className="truncate flex-1 min-w-0 text-muted-foreground" title={entry.note ? `${entry.category} (${entry.note})` : entry.category}>
+                  <div className="truncate flex-1 min-w-0 text-muted-foreground text-sm" title={entry.note ? `${entry.category} (${entry.note})` : entry.category}>
                     {entry.category}
                     {entry.note && (
                       <span className="text-foreground/80 font-medium"> ({entry.note})</span>
                     )}
                   </div>
                   <span className="font-semibold">£{entry.amount.toFixed(2)}</span>
-                  <button onClick={() => startEdit(entry)} className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"><Pencil className="w-3 h-3" /></button>
-                  <button onClick={() => onDelete(entry.id)} className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"><Trash2 className="w-3 h-3" /></button>
+                  <button onClick={() => startEdit(entry)} className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"><Pencil className="w-3.5 h-3.5" /></button>
+                  <button onClick={() => onDelete(entry.id)} className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"><Trash2 className="w-3.5 h-3.5" /></button>
                 </>
               )}
             </motion.div>
@@ -215,12 +215,12 @@ export function DayBox({ date, dateStr, entries, customCategories, allEntries, o
         {isAdding && (
           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden mb-2">
             <div className="flex flex-col gap-2 pt-2 border-t border-border">
-              <Input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} className="h-8 text-sm" placeholder="£ amount" autoFocus onKeyDown={(e) => e.key === 'Enter' && handleAdd()} />
+              <Input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} className="h-9 text-base" placeholder="£ amount" autoFocus onKeyDown={(e) => e.key === 'Enter' && handleAdd()} />
               <Select value={category} onValueChange={(v) => setCategory(v)}>
-                <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-9 text-base"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {allCategories.map((c) => (
-                    <SelectItem key={c} value={c} className="text-sm">{getCategoryEmoji(c, customCategories)} {c}</SelectItem>
+                    <SelectItem key={c} value={c} className="text-base">{getCategoryEmoji(c, customCategories)} {c}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -229,12 +229,12 @@ export function DayBox({ date, dateStr, entries, customCategories, allEntries, o
                 onChange={setNote}
                 entries={allEntries}
                 category={category}
-                className="h-8 text-sm"
+                className="h-9 text-base"
                 onEnter={handleAdd}
               />
-              <div className="flex gap-1.5">
-                <Button size="sm" className="flex-1 h-7" onClick={handleAdd}>Add</Button>
-                <Button size="sm" variant="ghost" className="h-7" onClick={() => { setIsAdding(false); setAmount(''); setNote(''); }}>Cancel</Button>
+              <div className="flex gap-2">
+                <Button size="sm" className="flex-1 h-9 text-sm" onClick={handleAdd}>Add</Button>
+                <Button size="sm" variant="ghost" className="h-9 text-sm" onClick={() => { setIsAdding(false); setAmount(''); setNote(''); }}>Cancel</Button>
               </div>
             </div>
           </motion.div>
@@ -245,10 +245,10 @@ export function DayBox({ date, dateStr, entries, customCategories, allEntries, o
         <Button
           variant="outline"
           size="sm"
-          className="w-full h-8 text-xs border-2 border-dashed border-foreground/40 hover:border-primary hover:text-primary hover:bg-primary/10 transition-all"
+          className="w-full h-9 text-sm border border-dashed border-border hover:border-primary hover:text-primary hover:bg-primary/10 transition-all"
           onClick={() => setIsAdding(true)}
         >
-          <Plus className="w-3.5 h-3.5 mr-1" />
+          <Plus className="w-4 h-4 mr-1" />
           Add Spend
         </Button>
       )}
