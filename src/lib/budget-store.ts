@@ -72,7 +72,79 @@ export async function initStore(): Promise<BudgetData> {
   }
   initialized = true;
   notify();
+  setupRealtime();
   return cache;
+}
+
+// ---------- Realtime sync across devices ----------
+let realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
+let realtimeVaultId: string | null = null;
+let refetchTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleRefetch() {
+  if (refetchTimer) clearTimeout(refetchTimer);
+  // Coalesce bursts of changes within 250ms
+  refetchTimer = setTimeout(() => { refetchAll(); }, 250);
+}
+
+async function refetchAll() {
+  const vid = getStoredVaultId();
+  if (!vid) return;
+  try {
+    const [entriesRes, mbRes, cbRes, ccRes] = await Promise.all([
+      supabase.from('spend_entries').select('*').eq('vault_id', vid),
+      supabase.from('monthly_budgets').select('*').eq('vault_id', vid),
+      supabase.from('category_budgets').select('*').eq('vault_id', vid),
+      supabase.from('custom_categories').select('*').eq('vault_id', vid),
+    ]);
+    cache = {
+      entries: (entriesRes.data || []).map(r => ({
+        id: r.id,
+        amount: Number(r.amount),
+        category: r.category,
+        date: r.entry_date,
+        createdAt: new Date(r.created_at).getTime(),
+        note: (r as any).note ?? undefined,
+      })),
+      monthlyBudgets: (mbRes.data || []).map(r => ({ month: r.month, amount: Number(r.amount) })),
+      categoryBudgets: (cbRes.data || []).map(r => ({
+        category: r.category, month: r.month, amount: Number(r.amount),
+      })),
+      customCategories: (ccRes.data || []).map(r => ({
+        name: r.name, emoji: r.emoji, color: r.color,
+      })),
+    };
+    notify();
+  } catch (e) {
+    console.error('refetchAll failed', e);
+  }
+}
+
+function setupRealtime() {
+  const vid = getStoredVaultId();
+  if (!vid) return;
+  if (realtimeChannel && realtimeVaultId === vid) return;
+  if (realtimeChannel) {
+    supabase.removeChannel(realtimeChannel);
+    realtimeChannel = null;
+  }
+  realtimeVaultId = vid;
+  const filter = `vault_id=eq.${vid}`;
+  realtimeChannel = supabase
+    .channel(`vault-${vid}`)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'spend_entries', filter }, scheduleRefetch)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'monthly_budgets', filter }, scheduleRefetch)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'category_budgets', filter }, scheduleRefetch)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'custom_categories', filter }, scheduleRefetch)
+    .subscribe();
+}
+
+// Re-fetch when window regains focus (PWA backgrounded → foreground)
+if (typeof window !== 'undefined') {
+  window.addEventListener('focus', () => { if (getStoredVaultId()) scheduleRefetch(); });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && getStoredVaultId()) scheduleRefetch();
+  });
 }
 
 export function isInitialized() {
