@@ -122,19 +122,19 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="icon" className="h-9 w-9 rounded-full border-2 border-foreground memphis-shadow-sm" onClick={() => setWeekStart(navigateWeek(weekStart, 'prev'))}>
+          <Button variant="outline" size="icon" className="h-10 w-10 rounded-full border border-border mcm-shadow-sm" onClick={() => setWeekStart(navigateWeek(weekStart, 'prev'))}>
             <ChevronLeft className="w-4 h-4" />
           </Button>
           <div className="text-center">
-            <h2 className="font-display font-bold text-lg">
+            <h2 className="font-display font-normal text-2xl tracking-wide leading-none">
               {formatDate(weekStart).slice(5)} – {formatDate(weekEnd).slice(5)}
             </h2>
-            <p className="text-xs text-muted-foreground">{formatDisplayMonth(weekStart)}</p>
+            <p className="text-sm text-muted-foreground font-serif-mcm italic mt-1">{formatDisplayMonth(weekStart)}</p>
           </div>
-          <Button variant="outline" size="icon" className="h-9 w-9 rounded-full border-2 border-foreground memphis-shadow-sm" onClick={() => setWeekStart(navigateWeek(weekStart, 'next'))}>
+          <Button variant="outline" size="icon" className="h-10 w-10 rounded-full border border-border mcm-shadow-sm" onClick={() => setWeekStart(navigateWeek(weekStart, 'next'))}>
             <ChevronRight className="w-4 h-4" />
           </Button>
-          <Button variant="ghost" size="sm" className="text-xs" onClick={() => setWeekStart(getWeekStart(new Date()))}>
+          <Button variant="ghost" size="sm" className="text-sm" onClick={() => setWeekStart(getWeekStart(new Date()))}>
             Today
           </Button>
         </div>
@@ -144,10 +144,10 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
             key={weekTotal}
             initial={{ scale: 0.9 }}
             animate={{ scale: 1 }}
-            className="px-4 py-2 rounded-xl bg-secondary font-display border-2 border-foreground memphis-shadow-sm"
+            className="px-4 py-2 rounded-lg bg-secondary border border-border mcm-shadow-sm"
           >
-            <span className="text-xs text-muted-foreground">Week Total</span>
-            <p className="font-bold text-lg">£{weekTotal.toFixed(2)}</p>
+            <span className="text-xs text-muted-foreground uppercase tracking-widest">Week Total</span>
+            <p className="font-display font-normal text-2xl tracking-wide leading-none mt-0.5">£{weekTotal.toFixed(2)}</p>
           </motion.div>
 
           {weeklyBudget !== null && budgetDiff !== null && (
@@ -155,16 +155,16 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
               key={budgetDiff}
               initial={{ scale: 0.9 }}
               animate={{ scale: 1 }}
-              className={`px-4 py-2 rounded-xl font-display border-2 border-foreground memphis-shadow-sm ${
+              className={`px-4 py-2 rounded-lg border border-border mcm-shadow-sm ${
                 budgetDiff >= 0
                   ? 'bg-budget-under/10 text-budget-under'
                   : 'bg-budget-over/10 text-budget-over'
               }`}
             >
-              <span className="text-xs opacity-75">
+              <span className="text-xs opacity-75 uppercase tracking-widest">
                 Budget: £{weeklyBudget.toFixed(2)}/wk
               </span>
-              <p className="font-bold text-lg">
+              <p className="font-display font-normal text-2xl tracking-wide leading-none mt-0.5">
                 {budgetDiff >= 0 ? '✅' : '🔴'} £{Math.abs(budgetDiff).toFixed(2)} {budgetDiff >= 0 ? 'under' : 'over'}
               </p>
             </motion.div>
@@ -172,7 +172,7 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
 
           <Dialog open={budgetDialogOpen} onOpenChange={(v) => { if (v) openBudgetDialog(); else setBudgetDialogOpen(false); }}>
             <DialogTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-1.5 rounded-full border-2 border-foreground memphis-shadow-sm">
+              <Button variant="outline" size="sm" className="gap-1.5 rounded-full border border-border mcm-shadow-sm text-sm">
                 <Target className="w-4 h-4" />
                 {currentBudget ? 'Edit Budget' : 'Set Budget'}
               </Button>

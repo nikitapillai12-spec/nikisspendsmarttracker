@@ -304,7 +304,7 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className={`rounded-2xl p-6 text-center font-display border-2 border-foreground memphis-shadow ${
+          className={`rounded-2xl p-6 text-center font-display border border-border mcm-shadow ${
             totalNetSavings >= 0
               ? 'bg-budget-under/15'
               : 'bg-budget-over/15'
@@ -332,7 +332,7 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-card rounded-2xl border-2 border-foreground p-6 memphis-shadow"
+          className="bg-card rounded-2xl border border-border p-6 mcm-shadow"
         >
           <h3 className="font-display font-bold text-lg mb-1">Actual Spend vs Monthly Budget</h3>
           <p className="text-sm text-muted-foreground mb-4">Bars show actual spend, dashed line shows your monthly budget, solid line is your spend trend. Hover a bar for insights.</p>
@@ -340,10 +340,10 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={budgetChartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `£${v}`} />
+                <XAxis dataKey="month" tick={{ fontSize: 13 }} />
+                <YAxis tick={{ fontSize: 13 }} tickFormatter={(v) => `£${v}`} />
                 <Tooltip content={<BudgetTooltip />} cursor={{ fill: 'hsl(var(--accent) / 0.08)' }} />
-                <Legend wrapperStyle={{ fontSize: '11px' }} />
+                <Legend wrapperStyle={{ fontSize: '13px' }} />
                 <Bar dataKey="spent" name="Actual spend" radius={[6, 6, 0, 0]}>
                   {budgetChartData.map((entry, index) => (
                     <Cell key={index} fill={entry.isOver ? 'hsl(var(--budget-over))' : 'hsl(var(--budget-under))'} />
@@ -379,7 +379,7 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: i * 0.05 }}
-                className={`rounded-xl p-3 text-center font-display border-2 border-foreground memphis-shadow-sm ${
+                className={`rounded-xl p-3 text-center font-display border border-border mcm-shadow-sm ${
                   d.isOver
                     ? 'bg-budget-over/15 text-budget-over'
                     : 'bg-budget-under/15 text-budget-under'
@@ -401,7 +401,7 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="bg-card rounded-2xl border-2 border-foreground p-6 memphis-shadow"
+        className="bg-card rounded-2xl border border-border p-6 mcm-shadow"
       >
         <h3 className="font-display font-bold text-lg mb-1">Monthly Spend Breakdown</h3>
         <p className="text-sm text-muted-foreground mb-4">Category composition with spend trend</p>
@@ -409,10 +409,10 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={stackedData}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="displayMonth" tick={{ fontSize: 12 }} />
-              <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `£${v}`} />
+              <XAxis dataKey="displayMonth" tick={{ fontSize: 13 }} />
+              <YAxis tick={{ fontSize: 13 }} tickFormatter={(v) => `£${v}`} />
               <Tooltip content={<StackedTooltip />} cursor={{ fill: 'hsl(var(--accent) / 0.08)' }} />
-              <Legend wrapperStyle={{ fontSize: '11px' }} />
+              <Legend wrapperStyle={{ fontSize: '13px' }} />
               {activeCategories.map((cat) => (
                 <Bar
                   key={cat}
@@ -441,7 +441,7 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="bg-card rounded-2xl border-2 border-foreground p-6 memphis-shadow"
+          className="bg-card rounded-2xl border border-border p-6 mcm-shadow"
         >
           <h3 className="font-display font-bold text-lg mb-1">Cumulative Savings Trend</h3>
           <p className="text-sm text-muted-foreground mb-4">Running total of savings vs overspend over time</p>
@@ -449,8 +449,8 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={cumulativeData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `£${v}`} />
+                <XAxis dataKey="month" tick={{ fontSize: 13 }} />
+                <YAxis tick={{ fontSize: 13 }} tickFormatter={(v) => `£${v}`} />
                 <Tooltip
                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', fontSize: '13px' }}
                   formatter={(value: number) => [`£${value.toFixed(2)}`, 'Net Savings']}
