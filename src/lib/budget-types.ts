@@ -20,21 +20,22 @@ export type DefaultCategory = typeof DEFAULT_CATEGORIES[number];
 export type Category = string;
 
 export const DEFAULT_CATEGORY_COLORS: Record<DefaultCategory, string> = {
-  'Groceries': 'hsl(145, 65%, 50%)',
-  'Eating Out': 'hsl(25, 95%, 58%)',
-  'Coffee': 'hsl(30, 70%, 45%)',
-  'Transport': 'hsl(210, 80%, 58%)',
-  'Home Improvement': 'hsl(280, 60%, 60%)',
-  'Toiletries': 'hsl(330, 70%, 62%)',
-  'Gifts': 'hsl(350, 85%, 62%)',
-  'Health & Wellness': 'hsl(170, 75%, 48%)',
-  'Subscriptions': 'hsl(250, 70%, 62%)',
-  'Utilities': 'hsl(45, 90%, 52%)',
-  'Rent': 'hsl(200, 75%, 52%)',
-  'Flights': 'hsl(290, 70%, 58%)',
-  'Travel Spend': 'hsl(180, 70%, 48%)',
-  'Insurance': 'hsl(15, 80%, 55%)',
-  'Other': 'hsl(230, 15%, 58%)',
+  // Mid-century modern palette: olive, terracotta, mustard, teal, sage, ochre, rust, dusty blue, plum
+  'Groceries':         'hsl(90, 35%, 40%)',   // olive
+  'Eating Out':        'hsl(15, 65%, 48%)',   // terracotta
+  'Coffee':            'hsl(25, 45%, 32%)',   // espresso brown
+  'Transport':         'hsl(200, 35%, 42%)',  // dusty blue
+  'Home Improvement':  'hsl(35, 35%, 45%)',   // walnut
+  'Toiletries':        'hsl(340, 30%, 55%)',  // dusty rose
+  'Gifts':             'hsl(355, 55%, 50%)',  // brick red
+  'Health & Wellness': 'hsl(160, 30%, 42%)',  // sage
+  'Subscriptions':     'hsl(250, 25%, 50%)',  // muted indigo
+  'Utilities':         'hsl(42, 75%, 50%)',   // mustard
+  'Rent':              'hsl(180, 35%, 38%)',  // teal
+  'Flights':           'hsl(280, 25%, 50%)',  // dusty plum
+  'Travel Spend':      'hsl(190, 35%, 45%)',  // dusty cyan
+  'Insurance':         'hsl(20, 55%, 45%)',   // burnt sienna
+  'Other':             'hsl(35, 12%, 50%)',   // taupe
 };
 
 export const DEFAULT_CATEGORY_EMOJI: Record<DefaultCategory, string> = {
