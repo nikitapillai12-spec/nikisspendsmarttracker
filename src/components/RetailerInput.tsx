@@ -62,7 +62,7 @@ export function RetailerInput({
         }}
       />
       {open && suggestions.length > 0 && (
-        <div className="absolute z-50 left-0 right-0 mt-1 bg-popover border-2 border-foreground rounded-lg shadow-[4px_4px_0_0_hsl(var(--foreground))] max-h-48 overflow-y-auto">
+        <div className="absolute z-50 left-0 right-0 mt-1 bg-popover border border-border rounded-lg shadow-[4px_4px_0_0_hsl(var(--foreground))] max-h-48 overflow-y-auto">
           {suggestions.map((s, i) => (
             <button
               key={s}
