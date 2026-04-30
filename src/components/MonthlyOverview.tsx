@@ -340,10 +340,10 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={budgetChartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `£${v}`} />
+                <XAxis dataKey="month" tick={{ fontSize: 13 }} />
+                <YAxis tick={{ fontSize: 13 }} tickFormatter={(v) => `£${v}`} />
                 <Tooltip content={<BudgetTooltip />} cursor={{ fill: 'hsl(var(--accent) / 0.08)' }} />
-                <Legend wrapperStyle={{ fontSize: '11px' }} />
+                <Legend wrapperStyle={{ fontSize: '13px' }} />
                 <Bar dataKey="spent" name="Actual spend" radius={[6, 6, 0, 0]}>
                   {budgetChartData.map((entry, index) => (
                     <Cell key={index} fill={entry.isOver ? 'hsl(var(--budget-over))' : 'hsl(var(--budget-under))'} />
@@ -409,10 +409,10 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={stackedData}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="displayMonth" tick={{ fontSize: 12 }} />
-              <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `£${v}`} />
+              <XAxis dataKey="displayMonth" tick={{ fontSize: 13 }} />
+              <YAxis tick={{ fontSize: 13 }} tickFormatter={(v) => `£${v}`} />
               <Tooltip content={<StackedTooltip />} cursor={{ fill: 'hsl(var(--accent) / 0.08)' }} />
-              <Legend wrapperStyle={{ fontSize: '11px' }} />
+              <Legend wrapperStyle={{ fontSize: '13px' }} />
               {activeCategories.map((cat) => (
                 <Bar
                   key={cat}
@@ -449,8 +449,8 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={cumulativeData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `£${v}`} />
+                <XAxis dataKey="month" tick={{ fontSize: 13 }} />
+                <YAxis tick={{ fontSize: 13 }} tickFormatter={(v) => `£${v}`} />
                 <Tooltip
                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', fontSize: '13px' }}
                   formatter={(value: number) => [`£${value.toFixed(2)}`, 'Net Savings']}
