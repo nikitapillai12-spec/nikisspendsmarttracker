@@ -15,6 +15,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import mcmLogo from '@/assets/mcm-logo.png';
 
 type Tab = 'weekly' | 'timeseries';
 
@@ -39,7 +40,7 @@ const Index = () => {
 
   return (
     <PasscodeGate>
-    <div className="min-h-screen mcm-bg relative overflow-x-hidden text-base">
+    <div className="min-h-screen mcm-bg relative overflow-x-hidden text-[17px]">
       {/* Decorative MCM shapes — organic atomic forms, sparse */}
       <div className="mcm-blob top-24 -left-12 w-40 h-24 rounded-[50%] bg-[hsl(var(--mcm-mustard))]/25 rotate-[-12deg]" />
       <div className="mcm-blob top-[28rem] -right-8 w-28 h-28 rounded-full bg-[hsl(var(--mcm-teal))]/20" />
@@ -51,16 +52,18 @@ const Index = () => {
         <div className="container max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <motion.span
-                className="text-2xl inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary text-primary-foreground mcm-shadow-sm"
-                animate={{ rotate: [0, -6, 6, -6, 0] }}
-                transition={{ duration: 1, repeat: Infinity, repeatDelay: 5 }}
-              >
-                💰
-              </motion.span>
+              <motion.img
+                src={mcmLogo}
+                alt="SpendSmart logo"
+                width={56}
+                height={56}
+                className="w-14 h-14 rounded-full bg-card border border-border mcm-shadow-sm object-contain p-1"
+                animate={{ rotate: [0, -4, 4, -4, 0] }}
+                transition={{ duration: 1.2, repeat: Infinity, repeatDelay: 6 }}
+              />
               <div>
-                <h1 className="font-display font-normal text-3xl tracking-wide leading-none">SPENDSMART</h1>
-                <p className="text-sm text-muted-foreground font-serif-mcm italic">Stay on top of what you spend on</p>
+                <h1 className="font-display font-normal text-4xl tracking-wide leading-none">SPENDSMART</h1>
+                <p className="text-base text-muted-foreground font-serif-mcm italic">Stay on top of what you spend on</p>
               </div>
             </div>
 
@@ -133,29 +136,15 @@ const Index = () => {
 
       {/* Content */}
       <main className="container max-w-7xl mx-auto px-4 py-6 relative z-10">
-        <AnimatePresence mode="wait">
-          {tab === 'weekly' ? (
-            <motion.div
-              key="weekly"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              transition={{ duration: 0.2 }}
-            >
-              <WeeklyView data={data} onDataChange={refreshData} />
-            </motion.div>
-          ) : (
-            <motion.div
-              key="timeseries"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.2 }}
-            >
-              <MonthlyOverview data={data} />
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {tab === 'weekly' ? (
+          <div key="weekly">
+            <WeeklyView data={data} onDataChange={refreshData} />
+          </div>
+        ) : (
+          <div key="timeseries">
+            <MonthlyOverview data={data} />
+          </div>
+        )}
       </main>
     </div>
     </PasscodeGate>
