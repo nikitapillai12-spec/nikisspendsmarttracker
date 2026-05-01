@@ -405,9 +405,13 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
       >
         <h3 className="font-display font-bold text-lg mb-1">Monthly Spend Breakdown</h3>
         <p className="text-sm text-muted-foreground mb-4">Category composition with spend trend</p>
+        {stackedData.length === 0 && (
+          <p className="text-sm text-muted-foreground py-8 text-center">No spend recorded yet.</p>
+        )}
+        {stackedData.length > 0 && (
         <div className="h-80">
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={stackedData}>
+            <ComposedChart data={stackedData} barCategoryGap="20%">
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis dataKey="displayMonth" tick={{ fontSize: 13 }} />
               <YAxis tick={{ fontSize: 13 }} tickFormatter={(v) => `£${v}`} />
@@ -419,6 +423,7 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
                   dataKey={cat}
                   stackId="spend"
                   fill={getCategoryColor(cat, customCats)}
+                  maxBarSize={120}
                   radius={cat === activeCategories[activeCategories.length - 1] ? [4, 4, 0, 0] : [0, 0, 0, 0]}
                 />
               ))}
@@ -433,6 +438,7 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
             </ComposedChart>
           </ResponsiveContainer>
         </div>
+        )}
       </motion.div>
 
       {/* Cumulative Savings Chart */}
