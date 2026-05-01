@@ -299,6 +299,12 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
 
   return (
     <div className="space-y-8">
+      {/* Header */}
+      <div>
+        <h2 className="font-display font-normal text-3xl tracking-wide">Time Series</h2>
+        <p className="text-base text-muted-foreground">Monthly trends, budget performance and category breakdown.</p>
+      </div>
+
       {/* Cumulative Net Savings Banner */}
       {cumulativeData.length > 0 && (
         <motion.div
