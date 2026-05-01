@@ -6,6 +6,7 @@ import { MonthlyOverview } from '@/components/MonthlyOverview';
 import { PasscodeGate, SESSION_KEY } from '@/components/PasscodeGate';
 import { BudgetData } from '@/lib/budget-types';
 import { getAll, subscribeStore, initStore, migrateLocalDataIfAny } from '@/lib/budget-store';
+import { getStoredVaultId } from '@/lib/vault-store';
 import { clearStoredVaultId } from '@/lib/vault-store';
 import { toast } from '@/components/ui/sonner';
 import {
@@ -24,6 +25,11 @@ const Index = () => {
   useEffect(() => {
     setData({ ...getAll() });
     const unsub = subscribeStore(d => setData({ ...d }));
+    // Defensive re-hydration in case Index mounted before PasscodeGate's initStore
+    // finished, or the cache was cleared (e.g. HMR). Safe to call multiple times.
+    if (getStoredVaultId()) {
+      initStore().then(d => setData({ ...d }));
+    }
     return () => { unsub(); };
   }, []);
 
