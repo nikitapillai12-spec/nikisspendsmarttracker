@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Target, Tag } from 'lucide-react';
 import { DayBox } from './DayBox';
 import { CategoryManager } from './CategoryManager';
-import { BudgetData, Category, SpendEntry, getAllCategories, getCategoryEmoji, getCategoryColor } from '@/lib/budget-types';
+import { BudgetData, Category, SpendEntry, EntryType, getAllCategories, getCategoryEmoji, getCategoryColor, signedAmount } from '@/lib/budget-types';
 import { getWeekStart, getWeekEnd, getWeekDays, formatDate, formatMonth, formatDisplayMonth, navigateWeek, getWeeklyBudget } from '@/lib/date-utils';
 import { addEntry, updateEntry, deleteEntry, getMonthlyBudget, setMonthlyBudget, setCategoryBudget, deleteCategoryBudget, getEffectiveCategoryBudget } from '@/lib/budget-store';
 import { Button } from '@/components/ui/button';
@@ -35,10 +35,10 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
     return data.entries.filter(e => e.date >= start && e.date <= end);
   }, [data.entries, weekStart, weekEnd]);
 
-  const weekTotal = weekEntries.reduce((s, e) => s + e.amount, 0);
+  const weekTotal = weekEntries.reduce((s, e) => s + signedAmount(e), 0);
   const budgetDiff = weeklyBudget ? weeklyBudget - weekTotal : null;
 
-  const handleAdd = useCallback((dateStr: string, amount: number, category: Category, note?: string) => {
+  const handleAdd = useCallback((dateStr: string, amount: number, category: Category, note?: string, type?: EntryType) => {
     const entry: SpendEntry = {
       id: crypto.randomUUID(),
       amount,
@@ -46,12 +46,13 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
       date: dateStr,
       createdAt: Date.now(),
       note,
+      type: type ?? 'spend',
     };
     onDataChange(addEntry(entry));
   }, [onDataChange]);
 
-  const handleUpdate = useCallback((id: string, amount: number, category: Category, note?: string) => {
-    onDataChange(updateEntry(id, { amount, category, note }));
+  const handleUpdate = useCallback((id: string, amount: number, category: Category, note?: string, type?: EntryType) => {
+    onDataChange(updateEntry(id, { amount, category, note, type }));
   }, [onDataChange]);
 
   const handleDelete = useCallback((id: string) => {
@@ -281,7 +282,7 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
                 entries={dayEntries}
                 customCategories={data.customCategories}
                 allEntries={data.entries}
-                onAdd={(amount, category, note) => handleAdd(dateStr, amount, category, note)}
+                onAdd={(amount, category, note, type) => handleAdd(dateStr, amount, category, note, type)}
                 onUpdate={handleUpdate}
                 onDelete={handleDelete}
               />
