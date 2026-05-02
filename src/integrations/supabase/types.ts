@@ -53,6 +53,7 @@ export type Database = {
           emoji: string
           id: string
           name: string
+          type: string
           vault_id: string
         }
         Insert: {
@@ -61,6 +62,7 @@ export type Database = {
           emoji: string
           id?: string
           name: string
+          type?: string
           vault_id: string
         }
         Update: {
@@ -69,6 +71,7 @@ export type Database = {
           emoji?: string
           id?: string
           name?: string
+          type?: string
           vault_id?: string
         }
         Relationships: [
@@ -118,6 +121,7 @@ export type Database = {
           entry_date: string
           id: string
           note: string | null
+          type: string
           vault_id: string
         }
         Insert: {
@@ -127,6 +131,7 @@ export type Database = {
           entry_date: string
           id?: string
           note?: string | null
+          type?: string
           vault_id: string
         }
         Update: {
@@ -136,6 +141,7 @@ export type Database = {
           entry_date?: string
           id?: string
           note?: string | null
+          type?: string
           vault_id?: string
         }
         Relationships: [
