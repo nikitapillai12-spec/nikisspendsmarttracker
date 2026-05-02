@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Pencil, Trash2, Check, X } from 'lucide-react';
-import { SpendEntry, Category, CustomCategory, EntryType, getAllCategories, getCategoryColor, getCategoryEmoji, signedAmount, DEFAULT_CREDIT_CATEGORIES } from '@/lib/budget-types';
+import { SpendEntry, Category, CustomCategory, EntryType, getAllCategories, getCategoryColor, getCategoryEmoji, signedAmount } from '@/lib/budget-types';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { formatDisplayDate, isToday } from '@/lib/date-utils';
 import { Button } from '@/components/ui/button';
