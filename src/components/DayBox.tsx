@@ -192,6 +192,18 @@ export function DayBox({ date, dateStr, entries, customCategories, allEntries, o
             <motion.div key={entry.id} layout initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} className="flex items-center gap-1.5 text-sm group">
               {editingId === entry.id ? (
                 <div className="flex flex-col gap-1.5 w-full">
+                  <div className="grid grid-cols-2 gap-1 p-0.5 rounded-full bg-secondary text-xs">
+                    <button
+                      type="button"
+                      onClick={() => switchType('spend')}
+                      className={`rounded-full py-1 font-semibold transition-colors ${entryType === 'spend' ? 'bg-budget-over/20 text-budget-over' : 'text-muted-foreground'}`}
+                    >− Spend</button>
+                    <button
+                      type="button"
+                      onClick={() => switchType('credit')}
+                      className={`rounded-full py-1 font-semibold transition-colors ${entryType === 'credit' ? 'bg-budget-under/20 text-budget-under' : 'text-muted-foreground'}`}
+                    >+ Credit</button>
+                  </div>
                   <div className="flex gap-1.5">
                     <Input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} className="h-8 text-sm flex-1" placeholder="£" />
                     <Select value={category} onValueChange={(v) => setCategory(v)}>
@@ -243,6 +255,18 @@ export function DayBox({ date, dateStr, entries, customCategories, allEntries, o
         {isAdding && (
           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden mb-2">
             <div className="flex flex-col gap-2 pt-2 border-t border-border">
+              <div className="grid grid-cols-2 gap-1 p-0.5 rounded-full bg-secondary text-xs">
+                <button
+                  type="button"
+                  onClick={() => switchType('spend')}
+                  className={`rounded-full py-1.5 font-semibold transition-colors ${entryType === 'spend' ? 'bg-budget-over/20 text-budget-over' : 'text-muted-foreground'}`}
+                >− Add a Spend</button>
+                <button
+                  type="button"
+                  onClick={() => switchType('credit')}
+                  className={`rounded-full py-1.5 font-semibold transition-colors ${entryType === 'credit' ? 'bg-budget-under/20 text-budget-under' : 'text-muted-foreground'}`}
+                >+ Add a Credit</button>
+              </div>
               <Input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} className="h-9 text-base" placeholder="£ amount" autoFocus onKeyDown={(e) => e.key === 'Enter' && handleAdd()} />
               <Select value={category} onValueChange={(v) => setCategory(v)}>
                 <SelectTrigger className="h-9 text-base"><SelectValue /></SelectTrigger>
