@@ -19,6 +19,23 @@ export const DEFAULT_CATEGORIES = [
 export type DefaultCategory = typeof DEFAULT_CATEGORIES[number];
 export type Category = string;
 
+export type EntryType = 'spend' | 'credit';
+
+/** Default categories for credits/refunds. Users can add more via the manager. */
+export const DEFAULT_CREDIT_CATEGORIES = [
+  'Shopping Refund',
+] as const;
+
+export type DefaultCreditCategory = typeof DEFAULT_CREDIT_CATEGORIES[number];
+
+export const DEFAULT_CREDIT_CATEGORY_COLORS: Record<DefaultCreditCategory, string> = {
+  'Shopping Refund': 'hsl(140, 45%, 38%)', // forest green
+};
+
+export const DEFAULT_CREDIT_CATEGORY_EMOJI: Record<DefaultCreditCategory, string> = {
+  'Shopping Refund': '↩️',
+};
+
 export const DEFAULT_CATEGORY_COLORS: Record<DefaultCategory, string> = {
   // Mid-century modern palette: olive, terracotta, mustard, teal, sage, ochre, rust, dusty blue, plum
   'Groceries':         'hsl(90, 35%, 40%)',   // olive
@@ -60,6 +77,7 @@ export interface CustomCategory {
   name: string;
   emoji: string;
   color: string;
+  type?: EntryType; // 'spend' (default) or 'credit'
 }
 
 export interface SpendEntry {
@@ -69,6 +87,7 @@ export interface SpendEntry {
   date: string; // YYYY-MM-DD
   createdAt: number;
   note?: string; // shop / retailer / website
+  type?: EntryType; // 'spend' (default) or 'credit'
 }
 
 export interface MonthlyBudget {
@@ -89,14 +108,30 @@ export interface BudgetData {
   categoryBudgets?: CategoryBudget[];
 }
 
-// Helper to get all categories (default + custom)
-export function getAllCategories(customCategories: CustomCategory[]): string[] {
-  return [...DEFAULT_CATEGORIES, ...customCategories.map(c => c.name)];
+// Helper to get all categories (default + custom) for a given entry type.
+// Defaults to 'spend' to keep all legacy callers working.
+export function getAllCategories(
+  customCategories: CustomCategory[],
+  type: EntryType = 'spend'
+): string[] {
+  if (type === 'credit') {
+    return [
+      ...DEFAULT_CREDIT_CATEGORIES,
+      ...customCategories.filter(c => c.type === 'credit').map(c => c.name),
+    ];
+  }
+  return [
+    ...DEFAULT_CATEGORIES,
+    ...customCategories.filter(c => (c.type ?? 'spend') === 'spend').map(c => c.name),
+  ];
 }
 
 export function getCategoryColor(category: string, customCategories: CustomCategory[]): string {
   if (category in DEFAULT_CATEGORY_COLORS) {
     return DEFAULT_CATEGORY_COLORS[category as DefaultCategory];
+  }
+  if (category in DEFAULT_CREDIT_CATEGORY_COLORS) {
+    return DEFAULT_CREDIT_CATEGORY_COLORS[category as DefaultCreditCategory];
   }
   const custom = customCategories.find(c => c.name === category);
   return custom?.color || 'hsl(230, 15%, 58%)';
@@ -106,6 +141,14 @@ export function getCategoryEmoji(category: string, customCategories: CustomCateg
   if (category in DEFAULT_CATEGORY_EMOJI) {
     return DEFAULT_CATEGORY_EMOJI[category as DefaultCategory];
   }
+  if (category in DEFAULT_CREDIT_CATEGORY_EMOJI) {
+    return DEFAULT_CREDIT_CATEGORY_EMOJI[category as DefaultCreditCategory];
+  }
   const custom = customCategories.find(c => c.name === category);
   return custom?.emoji || '🏷️';
+}
+
+/** Returns the signed contribution of an entry to totals: spend = +amount, credit = -amount. */
+export function signedAmount(entry: SpendEntry): number {
+  return (entry.type === 'credit') ? -entry.amount : entry.amount;
 }
