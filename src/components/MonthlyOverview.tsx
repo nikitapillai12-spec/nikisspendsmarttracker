@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { TrendingUp, TrendingDown } from 'lucide-react';
-import { BudgetData, getAllCategories, getCategoryColor, getCategoryEmoji } from '@/lib/budget-types';
+import { BudgetData, getAllCategories, getCategoryColor, getCategoryEmoji, signedAmount } from '@/lib/budget-types';
 import { getMonthsInRange } from '@/lib/date-utils';
 import { getEffectiveMonthlyBudget, getEffectiveCategoryBudget } from '@/lib/budget-store';
 import {
@@ -43,10 +43,13 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
   const monthlyData: MonthInsight[] = useMemo(() => {
     return months.map((month) => {
       const entries = data.entries.filter(e => e.date.startsWith(month));
+      const spendOnly = entries.filter(e => (e.type ?? 'spend') === 'spend');
       const byCategory: Record<string, number> = {};
       allCats.forEach(c => { byCategory[c] = 0; });
-      entries.forEach(e => { byCategory[e.category] = (byCategory[e.category] || 0) + e.amount; });
-      const total = entries.reduce((s, e) => s + e.amount, 0);
+      // Stacked breakdown only counts spends (credits don't appear as a stack chunk)
+      spendOnly.forEach(e => { byCategory[e.category] = (byCategory[e.category] || 0) + e.amount; });
+      // Net total (spend minus credit) — used for budget vs actual etc.
+      const total = entries.reduce((s, e) => s + signedAmount(e), 0);
       const budget = getEffectiveMonthlyBudget(data, month);
       const displayMonth = format(new Date(month + '-01'), 'MMM yy');
 
@@ -77,7 +80,7 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
       const overallByRetailer: Record<string, number> = {};
       allCats.forEach(cat => {
         const byRetailer: Record<string, number> = {};
-        entries
+        spendOnly
           .filter(e => e.category === cat && e.note && e.note.trim())
           .forEach(e => {
             const key = (e.note as string).trim();

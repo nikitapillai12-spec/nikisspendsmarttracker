@@ -51,6 +51,7 @@ export async function initStore(): Promise<BudgetData> {
         date: r.entry_date,
         createdAt: new Date(r.created_at).getTime(),
         note: (r as any).note ?? undefined,
+        type: ((r as any).type ?? 'spend') as 'spend' | 'credit',
       })),
       monthlyBudgets: (mbRes.data || []).map(r => ({
         month: r.month,
@@ -65,6 +66,7 @@ export async function initStore(): Promise<BudgetData> {
         name: r.name,
         emoji: r.emoji,
         color: r.color,
+        type: ((r as any).type ?? 'spend') as 'spend' | 'credit',
       })),
     };
   } catch (e) {
@@ -105,6 +107,7 @@ async function refetchAll() {
         date: r.entry_date,
         createdAt: new Date(r.created_at).getTime(),
         note: (r as any).note ?? undefined,
+        type: ((r as any).type ?? 'spend') as 'spend' | 'credit',
       })),
       monthlyBudgets: (mbRes.data || []).map(r => ({ month: r.month, amount: Number(r.amount) })),
       categoryBudgets: (cbRes.data || []).map(r => ({
@@ -112,6 +115,7 @@ async function refetchAll() {
       })),
       customCategories: (ccRes.data || []).map(r => ({
         name: r.name, emoji: r.emoji, color: r.color,
+        type: ((r as any).type ?? 'spend') as 'spend' | 'credit',
       })),
     };
     notify();
@@ -166,17 +170,19 @@ export function addEntry(entry: SpendEntry): BudgetData {
     amount: entry.amount,
     category: entry.category,
     note: entry.note ?? null,
+    type: entry.type ?? 'spend',
   }).then(({ error }) => { if (error) console.error('addEntry sync', error); });
   return cache;
 }
 
-export function updateEntry(id: string, updates: Partial<Pick<SpendEntry, 'amount' | 'category' | 'note'>>): BudgetData {
+export function updateEntry(id: string, updates: Partial<Pick<SpendEntry, 'amount' | 'category' | 'note' | 'type'>>): BudgetData {
   cache.entries = cache.entries.map(e => e.id === id ? { ...e, ...updates } : e);
   notify();
-  const patch: { amount?: number; category?: string; note?: string | null } = {};
+  const patch: { amount?: number; category?: string; note?: string | null; type?: string } = {};
   if (updates.amount !== undefined) patch.amount = updates.amount;
   if (updates.category !== undefined) patch.category = updates.category;
   if (updates.note !== undefined) patch.note = updates.note ?? null;
+  if (updates.type !== undefined) patch.type = updates.type;
   supabase.from('spend_entries').update(patch).eq('id', id)
     .then(({ error }) => { if (error) console.error('updateEntry sync', error); });
   return cache;
@@ -268,6 +274,7 @@ export function addCustomCategory(cat: CustomCategory): BudgetData {
     name: cat.name,
     emoji: cat.emoji,
     color: cat.color,
+    type: cat.type ?? 'spend',
   }).then(({ error }) => { if (error) console.error('addCustomCategory sync', error); });
   return cache;
 }
@@ -280,7 +287,7 @@ export function updateCustomCategory(oldName: string, cat: CustomCategory): Budg
   notify();
   const vid = vaultId();
   supabase.from('custom_categories').update({
-    name: cat.name, emoji: cat.emoji, color: cat.color,
+    name: cat.name, emoji: cat.emoji, color: cat.color, type: cat.type ?? 'spend',
   }).eq('vault_id', vid).eq('name', oldName)
     .then(({ error }) => { if (error) console.error('updateCustomCategory sync', error); });
   if (oldName !== cat.name) {

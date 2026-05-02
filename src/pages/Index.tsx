@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Wallet, BarChart3, Settings, KeyRound, Lock, CloudUpload, RefreshCw } from 'lucide-react';
+import { Wallet, BarChart3, Settings, CloudUpload, RefreshCw } from 'lucide-react';
 import { WeeklyView } from '@/components/WeeklyView';
 import { MonthlyOverview } from '@/components/MonthlyOverview';
-import { PasscodeGate, SESSION_KEY } from '@/components/PasscodeGate';
+import { AutoUnlock } from '@/components/AutoUnlock';
 import { BudgetData } from '@/lib/budget-types';
 import { getAll, subscribeStore, initStore, migrateLocalDataIfAny } from '@/lib/budget-store';
 import { getStoredVaultId } from '@/lib/vault-store';
-import { clearStoredVaultId } from '@/lib/vault-store';
 import { toast } from '@/components/ui/sonner';
 import {
   DropdownMenu,
@@ -39,7 +38,7 @@ const Index = () => {
   };
 
   return (
-    <PasscodeGate>
+    <AutoUnlock>
     <div className="min-h-screen mcm-bg relative overflow-x-hidden text-[17px]">
       {/* Decorative MCM shapes — organic atomic forms, sparse */}
       <div className="mcm-blob top-24 -left-12 w-40 h-24 rounded-[50%] bg-[hsl(var(--mcm-mustard))]/25 rotate-[-12deg]" />
@@ -88,19 +87,6 @@ const Index = () => {
                   }}>
                     <RefreshCw className="w-4 h-4 mr-2" /> Re-sync From Cloud
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => {
-                    clearStoredVaultId();
-                    sessionStorage.removeItem(SESSION_KEY);
-                    window.location.reload();
-                  }}>
-                    <KeyRound className="w-4 h-4 mr-2" /> Change Passcode
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => {
-                    sessionStorage.removeItem(SESSION_KEY);
-                    window.location.reload();
-                  }}>
-                    <Lock className="w-4 h-4 mr-2" /> Lock App
-                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
 
@@ -147,7 +133,7 @@ const Index = () => {
         )}
       </main>
     </div>
-    </PasscodeGate>
+    </AutoUnlock>
   );
 };
 
