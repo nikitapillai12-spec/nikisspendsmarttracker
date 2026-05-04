@@ -16,11 +16,13 @@ interface Props {
   onDataChange: (d: BudgetData) => void;
 }
 
-const blank = (platforms: string[]) => ({
+type Draft = { amount: number; platform: string; date: string; note?: string };
+
+const blank = (platforms: string[]): Draft => ({
   amount: 0,
   platform: platforms[0] || 'T212 ISA',
   date: formatDate(new Date()),
-  note: '' as string | undefined,
+  note: '',
 });
 
 export function InvestmentsManager({ data, onDataChange }: Props) {
@@ -31,7 +33,7 @@ export function InvestmentsManager({ data, onDataChange }: Props) {
     [data.investmentEntries],
   );
 
-  const [draft, setDraft] = useState(() => blank(platforms));
+  const [draft, setDraft] = useState<Draft>(() => blank(platforms));
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [newPlatform, setNewPlatform] = useState('');
