@@ -106,6 +106,53 @@ export interface BudgetData {
   monthlyBudgets: MonthlyBudget[];
   customCategories: CustomCategory[];
   categoryBudgets?: CategoryBudget[];
+  recurringPayments?: RecurringPayment[];
+  investmentEntries?: InvestmentEntry[];
+  investmentPlatforms?: string[];
+}
+
+/** A monthly recurring payment (rent, subscriptions, utilities, etc.).
+ *  Spread evenly across the weeks of the month for display only — does NOT
+ *  count towards the ad-hoc weekly spend total. */
+export interface RecurringPayment {
+  id: string;
+  label: string;       // e.g. "Rent", "Spotify"
+  amount: number;      // monthly amount in £
+  category: string;    // category bucket (e.g. "Rent", "Subscriptions")
+  startMonth: string;  // 'YYYY-MM' — applies from this month onwards
+  endMonth?: string;   // optional 'YYYY-MM' — last month it applies
+  active: boolean;
+}
+
+/** A money top-up into an investment platform. Tracked separately — does NOT
+ *  count towards spend totals. */
+export interface InvestmentEntry {
+  id: string;
+  amount: number;
+  platform: string;
+  date: string; // YYYY-MM-DD
+  note?: string;
+  createdAt: number;
+}
+
+/** Default investment platforms — users can add more via the manager. */
+export const DEFAULT_INVESTMENT_PLATFORMS = [
+  'T212 ISA',
+  'Freetrade GIA',
+  'InvestEngine GIA',
+  'IG Invest GIA',
+  'Robinhood GIA',
+] as const;
+
+/** Returns the active recurring payments for a given 'YYYY-MM' month. */
+export function getRecurringForMonth(
+  payments: RecurringPayment[] | undefined,
+  month: string
+): RecurringPayment[] {
+  if (!payments) return [];
+  return payments.filter(p =>
+    p.active && p.startMonth <= month && (!p.endMonth || p.endMonth >= month)
+  );
 }
 
 // Helper to get all categories (default + custom) for a given entry type.
