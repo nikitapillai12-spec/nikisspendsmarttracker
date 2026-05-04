@@ -447,7 +447,7 @@ export function updateRecurringPayment(id: string, updates: Partial<Omit<Recurri
     p.id === id ? { ...p, ...updates } : p
   );
   notify();
-  const patch: Record<string, unknown> = {};
+  const patch: { label?: string; amount?: number; category?: string; start_month?: string; end_month?: string | null; active?: boolean } = {};
   if (updates.label !== undefined) patch.label = updates.label;
   if (updates.amount !== undefined) patch.amount = updates.amount;
   if (updates.category !== undefined) patch.category = updates.category;
@@ -487,7 +487,7 @@ export function updateInvestmentEntry(id: string, updates: Partial<Pick<Investme
     e.id === id ? { ...e, ...updates } : e
   );
   notify();
-  const patch: Record<string, unknown> = {};
+  const patch: { amount?: number; platform?: string; entry_date?: string; note?: string | null } = {};
   if (updates.amount !== undefined) patch.amount = updates.amount;
   if (updates.platform !== undefined) patch.platform = updates.platform;
   if (updates.date !== undefined) patch.entry_date = updates.date;
