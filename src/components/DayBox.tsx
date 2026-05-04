@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Pencil, Trash2, Check, X } from 'lucide-react';
-import { SpendEntry, Category, CustomCategory, EntryType, getAllCategories, getCategoryColor, getCategoryEmoji, signedAmount } from '@/lib/budget-types';
+import { SpendEntry, Category, CustomCategory, EntryType, RecurringPayment, getAllCategories, getCategoryColor, getCategoryEmoji, signedAmount } from '@/lib/budget-types';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { formatDisplayDate, isToday } from '@/lib/date-utils';
 import { Button } from '@/components/ui/button';
@@ -16,12 +16,15 @@ interface DayBoxProps {
   customCategories: CustomCategory[];
   /** All entries across history — used to power retailer autocomplete suggestions. */
   allEntries: SpendEntry[];
+  /** Monthly recurring payment splits that "land" on this day. Display-only;
+   *  not counted in the day's ad-hoc total. */
+  recurringSplits?: { payment: RecurringPayment; perWeek: number }[];
   onAdd: (amount: number, category: Category, note?: string, type?: EntryType) => void;
   onUpdate: (id: string, amount: number, category: Category, note?: string, type?: EntryType) => void;
   onDelete: (id: string) => void;
 }
 
-export function DayBox({ date, dateStr, entries, customCategories, allEntries, onAdd, onUpdate, onDelete }: DayBoxProps) {
+export function DayBox({ date, dateStr, entries, customCategories, allEntries, recurringSplits, onAdd, onUpdate, onDelete }: DayBoxProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [amount, setAmount] = useState('');
@@ -249,6 +252,20 @@ export function DayBox({ date, dateStr, entries, customCategories, allEntries, o
           ))}
         </AnimatePresence>
       </div>
+
+      {/* Monthly recurring payment splits — read-only, separate from totals */}
+      {recurringSplits && recurringSplits.length > 0 && (
+        <div className="mb-3 rounded-lg border border-dashed border-border bg-secondary/40 p-2 space-y-1">
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Recurring (week share)</div>
+          {recurringSplits.map(({ payment, perWeek }) => (
+            <div key={payment.id} className="flex items-center gap-1.5 text-xs">
+              <span>{getCategoryEmoji(payment.category, customCategories)}</span>
+              <span className="truncate flex-1 text-muted-foreground" title={payment.label}>{payment.label}</span>
+              <span className="font-semibold">£{perWeek.toFixed(2)}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Add Form */}
       <AnimatePresence>

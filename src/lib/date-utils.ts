@@ -47,3 +47,31 @@ export function isToday(date: Date): boolean {
   const today = new Date();
   return format(date, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd');
 }
+
+/**
+ * Returns the number of distinct ISO weeks (Monday-start) that have at least
+ * one day inside the given calendar month. Used to evenly split a monthly
+ * recurring payment across the weeks it touches.
+ */
+export function weeksTouchingMonth(monthKey: string): number {
+  const first = new Date(monthKey + '-01');
+  const last = endOfMonth(first);
+  const seen = new Set<string>();
+  for (let d = new Date(first); d <= last; d = addDays(d, 1)) {
+    seen.add(format(getWeekStart(d), 'yyyy-MM-dd'));
+  }
+  return seen.size;
+}
+
+/**
+ * Decides which single day in the given week the recurring split is
+ * "billed" on for display purposes. Rule: the last day of the week that
+ * still lies in the month — so the split appears at the end of each week
+ * within that month.
+ */
+export function recurringDisplayDateInWeek(weekStart: Date, monthKey: string): string | null {
+  const days = getWeekDays(weekStart);
+  const inMonth = days.filter(d => format(d, 'yyyy-MM') === monthKey);
+  if (inMonth.length === 0) return null;
+  return formatDate(inMonth[inMonth.length - 1]);
+}
