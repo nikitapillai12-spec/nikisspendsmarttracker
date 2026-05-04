@@ -84,6 +84,57 @@ export type Database = {
           },
         ]
       }
+      investment_entries: {
+        Row: {
+          amount: number
+          created_at: string
+          entry_date: string
+          id: string
+          note: string | null
+          platform: string
+          vault_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          entry_date: string
+          id?: string
+          note?: string | null
+          platform: string
+          vault_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          entry_date?: string
+          id?: string
+          note?: string | null
+          platform?: string
+          vault_id?: string
+        }
+        Relationships: []
+      }
+      investment_platforms: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          vault_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          vault_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          vault_id?: string
+        }
+        Relationships: []
+      }
       monthly_budgets: {
         Row: {
           amount: number
@@ -112,6 +163,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      recurring_payments: {
+        Row: {
+          active: boolean
+          amount: number
+          category: string
+          created_at: string
+          end_month: string | null
+          id: string
+          label: string
+          start_month: string
+          vault_id: string
+        }
+        Insert: {
+          active?: boolean
+          amount: number
+          category: string
+          created_at?: string
+          end_month?: string | null
+          id?: string
+          label: string
+          start_month?: string
+          vault_id: string
+        }
+        Update: {
+          active?: boolean
+          amount?: number
+          category?: string
+          created_at?: string
+          end_month?: string | null
+          id?: string
+          label?: string
+          start_month?: string
+          vault_id?: string
+        }
+        Relationships: []
       }
       spend_entries: {
         Row: {
