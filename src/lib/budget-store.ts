@@ -424,3 +424,104 @@ export async function migrateLocalDataIfAny(): Promise<boolean> {
     return false;
   }
 }
+
+// ---------- Recurring monthly payments ----------
+export function addRecurringPayment(p: RecurringPayment): BudgetData {
+  cache.recurringPayments = [...(cache.recurringPayments || []), p];
+  notify();
+  supabase.from('recurring_payments').insert({
+    id: p.id,
+    vault_id: vaultId(),
+    label: p.label,
+    amount: p.amount,
+    category: p.category,
+    start_month: p.startMonth,
+    end_month: p.endMonth ?? null,
+    active: p.active,
+  }).then(({ error }) => { if (error) console.error('addRecurringPayment sync', error); });
+  return cache;
+}
+
+export function updateRecurringPayment(id: string, updates: Partial<Omit<RecurringPayment, 'id'>>): BudgetData {
+  cache.recurringPayments = (cache.recurringPayments || []).map(p =>
+    p.id === id ? { ...p, ...updates } : p
+  );
+  notify();
+  const patch: Record<string, unknown> = {};
+  if (updates.label !== undefined) patch.label = updates.label;
+  if (updates.amount !== undefined) patch.amount = updates.amount;
+  if (updates.category !== undefined) patch.category = updates.category;
+  if (updates.startMonth !== undefined) patch.start_month = updates.startMonth;
+  if (updates.endMonth !== undefined) patch.end_month = updates.endMonth ?? null;
+  if (updates.active !== undefined) patch.active = updates.active;
+  supabase.from('recurring_payments').update(patch).eq('id', id)
+    .then(({ error }) => { if (error) console.error('updateRecurringPayment sync', error); });
+  return cache;
+}
+
+export function deleteRecurringPayment(id: string): BudgetData {
+  cache.recurringPayments = (cache.recurringPayments || []).filter(p => p.id !== id);
+  notify();
+  supabase.from('recurring_payments').delete().eq('id', id)
+    .then(({ error }) => { if (error) console.error('deleteRecurringPayment sync', error); });
+  return cache;
+}
+
+// ---------- Investment entries ----------
+export function addInvestmentEntry(e: InvestmentEntry): BudgetData {
+  cache.investmentEntries = [...(cache.investmentEntries || []), e];
+  notify();
+  supabase.from('investment_entries').insert({
+    id: e.id,
+    vault_id: vaultId(),
+    amount: e.amount,
+    platform: e.platform,
+    entry_date: e.date,
+    note: e.note ?? null,
+  }).then(({ error }) => { if (error) console.error('addInvestmentEntry sync', error); });
+  return cache;
+}
+
+export function updateInvestmentEntry(id: string, updates: Partial<Pick<InvestmentEntry, 'amount' | 'platform' | 'date' | 'note'>>): BudgetData {
+  cache.investmentEntries = (cache.investmentEntries || []).map(e =>
+    e.id === id ? { ...e, ...updates } : e
+  );
+  notify();
+  const patch: Record<string, unknown> = {};
+  if (updates.amount !== undefined) patch.amount = updates.amount;
+  if (updates.platform !== undefined) patch.platform = updates.platform;
+  if (updates.date !== undefined) patch.entry_date = updates.date;
+  if (updates.note !== undefined) patch.note = updates.note ?? null;
+  supabase.from('investment_entries').update(patch).eq('id', id)
+    .then(({ error }) => { if (error) console.error('updateInvestmentEntry sync', error); });
+  return cache;
+}
+
+export function deleteInvestmentEntry(id: string): BudgetData {
+  cache.investmentEntries = (cache.investmentEntries || []).filter(e => e.id !== id);
+  notify();
+  supabase.from('investment_entries').delete().eq('id', id)
+    .then(({ error }) => { if (error) console.error('deleteInvestmentEntry sync', error); });
+  return cache;
+}
+
+// ---------- Investment platforms ----------
+export function addInvestmentPlatform(name: string): BudgetData {
+  const trimmed = name.trim();
+  if (!trimmed) return cache;
+  if ((cache.investmentPlatforms || []).includes(trimmed)) return cache;
+  cache.investmentPlatforms = [...(cache.investmentPlatforms || []), trimmed];
+  notify();
+  supabase.from('investment_platforms').insert({ vault_id: vaultId(), name: trimmed })
+    .then(({ error }) => { if (error) console.error('addInvestmentPlatform sync', error); });
+  return cache;
+}
+
+export function deleteInvestmentPlatform(name: string): BudgetData {
+  cache.investmentPlatforms = (cache.investmentPlatforms || []).filter(n => n !== name);
+  notify();
+  supabase.from('investment_platforms').delete()
+    .eq('vault_id', vaultId()).eq('name', name)
+    .then(({ error }) => { if (error) console.error('deleteInvestmentPlatform sync', error); });
+  return cache;
+}
