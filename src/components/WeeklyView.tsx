@@ -3,8 +3,10 @@ import { motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Target, Tag } from 'lucide-react';
 import { DayBox } from './DayBox';
 import { CategoryManager } from './CategoryManager';
-import { BudgetData, Category, SpendEntry, EntryType, getAllCategories, getCategoryEmoji, getCategoryColor, signedAmount } from '@/lib/budget-types';
-import { getWeekStart, getWeekEnd, getWeekDays, formatDate, formatMonth, formatDisplayMonth, navigateWeek, getWeeklyBudget } from '@/lib/date-utils';
+import { RecurringPaymentsManager } from './RecurringPaymentsManager';
+import { InvestmentsManager } from './InvestmentsManager';
+import { BudgetData, Category, SpendEntry, EntryType, RecurringPayment, getAllCategories, getCategoryEmoji, getCategoryColor, getRecurringForMonth, signedAmount } from '@/lib/budget-types';
+import { getWeekStart, getWeekEnd, getWeekDays, formatDate, formatMonth, formatDisplayMonth, navigateWeek, getWeeklyBudget, weeksTouchingMonth, recurringDisplayDateInWeek } from '@/lib/date-utils';
 import { addEntry, updateEntry, deleteEntry, getMonthlyBudget, setMonthlyBudget, setCategoryBudget, deleteCategoryBudget, getEffectiveCategoryBudget } from '@/lib/budget-store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,6 +30,38 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
   const currentBudget = getMonthlyBudget(month);
   const weeklyBudget = currentBudget ? getWeeklyBudget(currentBudget) : null;
   const allCats = useMemo(() => getAllCategories(data.customCategories), [data.customCategories]);
+
+  // Recurring monthly payments → split per week of the month they apply to.
+  // Computed for the week's primary month, then picked into the right day cell.
+  const recurringSplits = useMemo(() => {
+    const result: Array<{ payment: RecurringPayment; perWeek: number; displayDate: string | null }> = [];
+    // A week may span two months. Compute splits for both months, keep only
+    // those whose displayDate falls inside this exact week.
+    const monthsForWeek = new Set<string>();
+    days.forEach(d => monthsForWeek.add(formatMonth(d)));
+    monthsForWeek.forEach(mk => {
+      const active = getRecurringForMonth(data.recurringPayments, mk);
+      if (active.length === 0) return;
+      const weeksInMonth = Math.max(1, weeksTouchingMonth(mk));
+      const displayDate = recurringDisplayDateInWeek(weekStart, mk);
+      active.forEach(p => {
+        result.push({ payment: p, perWeek: p.amount / weeksInMonth, displayDate });
+      });
+    });
+    return result;
+  }, [data.recurringPayments, days, weekStart]);
+
+  // Group recurring splits by date string for quick lookup per day cell
+  const recurringByDate = useMemo(() => {
+    const m: Record<string, Array<{ payment: RecurringPayment; perWeek: number }>> = {};
+    recurringSplits.forEach(({ payment, perWeek, displayDate }) => {
+      if (!displayDate) return;
+      (m[displayDate] = m[displayDate] || []).push({ payment, perWeek });
+    });
+    return m;
+  }, [recurringSplits]);
+
+  const recurringWeekTotal = recurringSplits.reduce((s, x) => s + x.perWeek, 0);
 
   const weekEntries = useMemo(() => {
     const start = formatDate(weekStart);
@@ -261,14 +295,34 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
             </DialogContent>
           </Dialog>
 
+          <RecurringPaymentsManager data={data} onDataChange={onDataChange} />
+          <InvestmentsManager data={data} onDataChange={onDataChange} />
           <CategoryManager data={data} onDataChange={onDataChange} />
         </div>
       </div>
+
+      {recurringWeekTotal > 0 && (
+        <div className="rounded-xl border border-dashed border-border bg-secondary/40 px-4 py-3 text-sm flex flex-wrap items-center gap-x-4 gap-y-1">
+          <span className="font-display font-bold tracking-wide">Monthly payments split this week:</span>
+          {Object.entries(
+            recurringSplits.reduce<Record<string, number>>((acc, { payment, perWeek }) => {
+              acc[payment.label] = (acc[payment.label] || 0) + perWeek;
+              return acc;
+            }, {})
+          ).map(([label, amt]) => (
+            <span key={label} className="text-muted-foreground">
+              {label} <span className="font-semibold text-foreground">£{amt.toFixed(2)}</span>
+            </span>
+          ))}
+          <span className="ml-auto font-display font-bold">= £{recurringWeekTotal.toFixed(2)}</span>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
         {days.map((day, i) => {
           const dateStr = formatDate(day);
           const dayEntries = data.entries.filter(e => e.date === dateStr);
+          const dayRecurring = recurringByDate[dateStr] || [];
           return (
             <motion.div
               key={dateStr}
@@ -282,6 +336,7 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
                 entries={dayEntries}
                 customCategories={data.customCategories}
                 allEntries={data.entries}
+                recurringSplits={dayRecurring}
                 onAdd={(amount, category, note, type) => handleAdd(dateStr, amount, category, note, type)}
                 onUpdate={handleUpdate}
                 onDelete={handleDelete}
