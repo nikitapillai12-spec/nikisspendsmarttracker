@@ -1,4 +1,4 @@
-import { BudgetData, SpendEntry, CustomCategory } from './budget-types';
+import { BudgetData, SpendEntry, CustomCategory, RecurringPayment, InvestmentEntry, DEFAULT_INVESTMENT_PLATFORMS } from './budget-types';
 import { supabase } from '@/integrations/supabase/client';
 import { getStoredVaultId } from './vault-store';
 
@@ -8,6 +8,9 @@ let cache: BudgetData = {
   monthlyBudgets: [],
   customCategories: [],
   categoryBudgets: [],
+  recurringPayments: [],
+  investmentEntries: [],
+  investmentPlatforms: [],
 };
 
 let initialized = false;
@@ -36,11 +39,14 @@ export async function initStore(): Promise<BudgetData> {
     return cache;
   }
   try {
-    const [entriesRes, mbRes, cbRes, ccRes] = await Promise.all([
+    const [entriesRes, mbRes, cbRes, ccRes, rpRes, ieRes, ipRes] = await Promise.all([
       supabase.from('spend_entries').select('*').eq('vault_id', vid),
       supabase.from('monthly_budgets').select('*').eq('vault_id', vid),
       supabase.from('category_budgets').select('*').eq('vault_id', vid),
       supabase.from('custom_categories').select('*').eq('vault_id', vid),
+      supabase.from('recurring_payments').select('*').eq('vault_id', vid),
+      supabase.from('investment_entries').select('*').eq('vault_id', vid),
+      supabase.from('investment_platforms').select('*').eq('vault_id', vid),
     ]);
 
     cache = {
@@ -68,7 +74,26 @@ export async function initStore(): Promise<BudgetData> {
         color: r.color,
         type: ((r as any).type ?? 'spend') as 'spend' | 'credit',
       })),
+      recurringPayments: (rpRes.data || []).map(r => ({
+        id: r.id,
+        label: r.label,
+        amount: Number(r.amount),
+        category: r.category,
+        startMonth: r.start_month,
+        endMonth: r.end_month ?? undefined,
+        active: r.active,
+      })),
+      investmentEntries: (ieRes.data || []).map(r => ({
+        id: r.id,
+        amount: Number(r.amount),
+        platform: r.platform,
+        date: r.entry_date,
+        note: r.note ?? undefined,
+        createdAt: new Date(r.created_at).getTime(),
+      })),
+      investmentPlatforms: (ipRes.data || []).map(r => r.name),
     };
+    await ensureDefaultPlatforms(vid);
   } catch (e) {
     console.error('initStore failed', e);
   }
@@ -76,6 +101,19 @@ export async function initStore(): Promise<BudgetData> {
   notify();
   setupRealtime();
   return cache;
+}
+
+async function ensureDefaultPlatforms(vid: string) {
+  const existing = new Set(cache.investmentPlatforms || []);
+  const missing = DEFAULT_INVESTMENT_PLATFORMS.filter(p => !existing.has(p));
+  if (missing.length === 0) return;
+  const rows = missing.map(name => ({ vault_id: vid, name }));
+  const { error } = await supabase.from('investment_platforms').insert(rows);
+  if (error) {
+    // Likely a unique-constraint race from another device — safe to ignore
+    return;
+  }
+  cache.investmentPlatforms = [...(cache.investmentPlatforms || []), ...missing];
 }
 
 // ---------- Realtime sync across devices ----------
@@ -93,11 +131,14 @@ async function refetchAll() {
   const vid = getStoredVaultId();
   if (!vid) return;
   try {
-    const [entriesRes, mbRes, cbRes, ccRes] = await Promise.all([
+    const [entriesRes, mbRes, cbRes, ccRes, rpRes, ieRes, ipRes] = await Promise.all([
       supabase.from('spend_entries').select('*').eq('vault_id', vid),
       supabase.from('monthly_budgets').select('*').eq('vault_id', vid),
       supabase.from('category_budgets').select('*').eq('vault_id', vid),
       supabase.from('custom_categories').select('*').eq('vault_id', vid),
+      supabase.from('recurring_payments').select('*').eq('vault_id', vid),
+      supabase.from('investment_entries').select('*').eq('vault_id', vid),
+      supabase.from('investment_platforms').select('*').eq('vault_id', vid),
     ]);
     cache = {
       entries: (entriesRes.data || []).map(r => ({
@@ -117,6 +158,24 @@ async function refetchAll() {
         name: r.name, emoji: r.emoji, color: r.color,
         type: ((r as any).type ?? 'spend') as 'spend' | 'credit',
       })),
+      recurringPayments: (rpRes.data || []).map(r => ({
+        id: r.id,
+        label: r.label,
+        amount: Number(r.amount),
+        category: r.category,
+        startMonth: r.start_month,
+        endMonth: r.end_month ?? undefined,
+        active: r.active,
+      })),
+      investmentEntries: (ieRes.data || []).map(r => ({
+        id: r.id,
+        amount: Number(r.amount),
+        platform: r.platform,
+        date: r.entry_date,
+        note: r.note ?? undefined,
+        createdAt: new Date(r.created_at).getTime(),
+      })),
+      investmentPlatforms: (ipRes.data || []).map(r => r.name),
     };
     notify();
   } catch (e) {
@@ -140,6 +199,9 @@ function setupRealtime() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'monthly_budgets', filter }, scheduleRefetch)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'category_budgets', filter }, scheduleRefetch)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'custom_categories', filter }, scheduleRefetch)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'recurring_payments', filter }, scheduleRefetch)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'investment_entries', filter }, scheduleRefetch)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'investment_platforms', filter }, scheduleRefetch)
     .subscribe();
 }
 
