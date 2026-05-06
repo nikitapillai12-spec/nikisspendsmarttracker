@@ -703,3 +703,61 @@ export async function maybeRunDailyBackup(): Promise<void> {
   const res = await saveDailyBackupToCloud();
   if (res.saved) localStorage.setItem(flagKey, today);
 }
+
+// ---------- Refund learned patterns (cross-device) ----------
+
+const LOCAL_PATTERNS_KEY = 'refund_learned_patterns';
+
+export interface LearnedPattern {
+  spendCategory: string;
+  creditCategory: string;
+  merchantMatch: 'exact' | 'partial' | 'none';
+  count: number;
+}
+
+/** Load patterns — tries Supabase first, falls back to localStorage. */
+export async function loadLearnedPatternsFromCloud(): Promise<LearnedPattern[]> {
+  const vid = getStoredVaultId();
+  if (vid) {
+    const { data, error } = await supabase
+      .from('refund_learned_patterns')
+      .select('patterns')
+      .eq('vault_id', vid)
+      .maybeSingle();
+    if (!error && data?.patterns) {
+      const cloud = data.patterns as LearnedPattern[];
+      // Merge with any local-only patterns not yet synced
+      const local = loadLocalPatterns();
+      const merged = mergePatterns(cloud, local);
+      // Write merged back locally as cache
+      try { localStorage.setItem(LOCAL_PATTERNS_KEY, JSON.stringify(merged)); } catch {}
+      return merged;
+    }
+  }
+  return loadLocalPatterns();
+}
+
+/** Save an updated patterns array to both Supabase and localStorage. */
+export async function saveLearnedPatternsToCloud(patterns: LearnedPattern[]): Promise<void> {
+  try { localStorage.setItem(LOCAL_PATTERNS_KEY, JSON.stringify(patterns)); } catch {}
+  const vid = getStoredVaultId();
+  if (!vid) return;
+  const { error } = await supabase
+    .from('refund_learned_patterns')
+    .upsert({ vault_id: vid, patterns, updated_at: new Date().toISOString() }, { onConflict: 'vault_id' });
+  if (error) console.error('saveLearnedPatternsToCloud', error);
+}
+
+function loadLocalPatterns(): LearnedPattern[] {
+  try { return JSON.parse(localStorage.getItem(LOCAL_PATTERNS_KEY) || '[]'); } catch { return []; }
+}
+
+function mergePatterns(a: LearnedPattern[], b: LearnedPattern[]): LearnedPattern[] {
+  const result = [...a];
+  for (const bp of b) {
+    const existing = result.find(p => p.spendCategory === bp.spendCategory && p.creditCategory === bp.creditCategory && p.merchantMatch === bp.merchantMatch);
+    if (existing) { existing.count = Math.max(existing.count, bp.count); }
+    else { result.push(bp); }
+  }
+  return result;
+}

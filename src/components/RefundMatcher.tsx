@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { SpendEntry, BudgetData } from '@/lib/budget-types';
-import { linkRefundPair } from '@/lib/budget-store';
+import { linkRefundPair, loadLearnedPatternsFromCloud, saveLearnedPatternsToCloud, LearnedPattern } from '@/lib/budget-store';
 
 interface RefundPair {
   id: string;
@@ -11,28 +11,6 @@ interface RefundPair {
   reason: string;
   netAmount: number;
   isFullRefund: boolean;
-}
-
-// Learned patterns: category pairs that have been confirmed as refunds before
-const STORAGE_KEY = 'refund_learned_patterns';
-
-interface LearnedPattern {
-  spendCategory: string;
-  creditCategory: string;
-  merchantMatch: 'exact' | 'partial' | 'none'; // what kind of merchant match existed when confirmed
-  count: number;
-}
-
-function loadLearnedPatterns(): LearnedPattern[] {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { return []; }
-}
-
-function saveLearnedPattern(spend: SpendEntry, credit: SpendEntry, merchantMatch: 'exact' | 'partial' | 'none') {
-  const patterns = loadLearnedPatterns();
-  const key = `${spend.category}|${credit.category}|${merchantMatch}`;
-  const existing = patterns.find(p => `${p.spendCategory}|${p.creditCategory}|${p.merchantMatch}` === key);
-  if (existing) { existing.count++; } else { patterns.push({ spendCategory: spend.category, creditCategory: credit.category, merchantMatch, count: 1 }); }
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(patterns)); } catch {}
 }
 
 // Words too generic to count as merchant evidence
@@ -159,8 +137,7 @@ function scoreMatch(spend: SpendEntry, credit: SpendEntry, learned: LearnedPatte
   return { score, reason: reasons.filter(r => r !== 'different merchants').join(' · '), merchantMatch };
 }
 
-export function findRefundPairs(entries: SpendEntry[]): RefundPair[] {
-  const learned = loadLearnedPatterns();
+export function findRefundPairs(entries: SpendEntry[], learned: LearnedPattern[] = []): RefundPair[] {
   const spends = entries.filter(e => (e.type ?? 'spend') === 'spend' && !e.refundPairId);
   const credits = entries.filter(e => e.type === 'credit' && !e.refundPairId);
   const pairs: RefundPair[] = [];
@@ -185,14 +162,19 @@ export function findRefundPairs(entries: SpendEntry[]): RefundPair[] {
   return pairs;
 }
 
-// Called when user confirms a pair — saves the pattern for future learning
-export function learnFromConfirmedPair(spend: SpendEntry, credit: SpendEntry) {
-  const spendNote = (spend.note || '').trim();
-  const creditNote = (credit.note || '').trim();
-  const sim = merchantSimilarity(spendNote, creditNote);
-  const merchantMatch: 'exact' | 'partial' | 'none' =
-    sim.level === 'exact' ? 'exact' : (sim.level === 'strong' || sim.level === 'weak') ? 'partial' : 'none';
-  saveLearnedPattern(spend, credit, merchantMatch);
+function buildUpdatedPatterns(confirmed: Array<{ spend: SpendEntry; credit: SpendEntry }>, existing: LearnedPattern[]): LearnedPattern[] {
+  const result = [...existing];
+  for (const { spend, credit } of confirmed) {
+    const spendNote = (spend.note || '').trim();
+    const creditNote = (credit.note || '').trim();
+    const sim = merchantSimilarity(spendNote, creditNote);
+    const merchantMatch: 'exact' | 'partial' | 'none' =
+      sim.level === 'exact' ? 'exact' : (sim.level === 'strong' || sim.level === 'weak') ? 'partial' : 'none';
+    const key = `${spend.category}|${credit.category}|${merchantMatch}`;
+    const ep = result.find(p => `${p.spendCategory}|${p.creditCategory}|${p.merchantMatch}` === key);
+    if (ep) { ep.count++; } else { result.push({ spendCategory: spend.category, creditCategory: credit.category, merchantMatch, count: 1 }); }
+  }
+  return result;
 }
 
 interface Props { data: BudgetData; onDataChange: (d: BudgetData) => void; }
@@ -220,21 +202,39 @@ export function RefundMatcher({ data, onDataChange }: Props) {
   const [open, setOpen] = useState(false);
   const [confirmed, setConfirmed] = useState<Set<string>>(new Set());
   const [rejected, setRejected] = useState<Set<string>>(new Set());
-  const [scanned, setScanned] = useState(false);
+  // Track last scanned entry count so we rescan when new entries are added
+  const lastScannedCount = useRef<number>(-1);
+  const learnedRef = useRef<LearnedPattern[]>([]);
   const portalRoot = useRef<HTMLElement | null>(null);
 
   useEffect(() => { portalRoot.current = document.body; }, []);
 
+  // Load cloud patterns once on mount
   useEffect(() => {
-    if (data.entries.length === 0 || scanned) return;
-    const found = findRefundPairs(data.entries);
+    loadLearnedPatternsFromCloud().then(p => { learnedRef.current = p; });
+  }, []);
+
+  // Rescan whenever entry count changes (catches newly added entries)
+  useEffect(() => {
+    if (data.entries.length === 0) return;
+    if (data.entries.length === lastScannedCount.current) return;
+    lastScannedCount.current = data.entries.length;
+    const found = findRefundPairs(data.entries, learnedRef.current);
     if (found.length > 0) {
-      setPairs(found);
-      setConfirmed(new Set(found.filter(p => p.confidence === 'high').map(p => p.id)));
+      // Preserve existing confirm/reject decisions for pairs we've already seen
+      setPairs(prev => {
+        const existingIds = new Set(prev.map(p => p.id));
+        const newPairs = found.filter(p => !existingIds.has(p.id));
+        return [...prev.filter(p => found.some(f => f.id === p.id)), ...newPairs];
+      });
+      setConfirmed(prev => {
+        const s = new Set(prev);
+        found.filter(p => p.confidence === 'high' && !prev.has(p.id) && lastScannedCount.current === data.entries.length).forEach(p => s.add(p.id));
+        return s;
+      });
       setOpen(true);
     }
-    setScanned(true);
-  }, [data.entries.length, scanned]);
+  }, [data.entries.length]);
 
   const confirm = useCallback((id: string) => {
     setConfirmed(p => { const s = new Set(p); s.add(id); return s; });
@@ -248,11 +248,18 @@ export function RefundMatcher({ data, onDataChange }: Props) {
 
   const applyAll = useCallback(() => {
     let latest = data;
+    const confirmedPairs: Array<{ spend: SpendEntry; credit: SpendEntry }> = [];
     for (const pair of pairs) {
       if (confirmed.has(pair.id)) {
         latest = linkRefundPair(pair.spend.id, pair.credit.id);
-        learnFromConfirmedPair(pair.spend, pair.credit);
+        confirmedPairs.push({ spend: pair.spend, credit: pair.credit });
       }
+    }
+    // Update learned patterns and sync to cloud
+    if (confirmedPairs.length > 0) {
+      const updated = buildUpdatedPatterns(confirmedPairs, learnedRef.current);
+      learnedRef.current = updated;
+      saveLearnedPatternsToCloud(updated);
     }
     setPairs(p => p.filter(x => !confirmed.has(x.id) && !rejected.has(x.id)));
     setConfirmed(new Set()); setRejected(new Set());
