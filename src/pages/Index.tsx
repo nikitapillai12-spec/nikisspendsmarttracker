@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { BackupSettings } from '@/components/BackupSettings';
 import { PdfImport } from '@/components/PdfImport';
+import { RefundMatcher } from '@/components/RefundMatcher';
 import { FileText } from 'lucide-react';
 
 type Tab = 'weekly' | 'timeseries';
@@ -40,6 +41,7 @@ const Index = () => {
 
   return (
     <AutoUnlock>
+    <RefundMatcher data={data} onDataChange={refreshData} />
     <div className="min-h-screen mcm-bg relative overflow-x-hidden">
 
       {/* Memphis geometric accent shapes — bold, sparse, editorial */}

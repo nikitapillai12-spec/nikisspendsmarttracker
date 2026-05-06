@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RetailerInput } from './RetailerInput';
 import { linkRefundPair, unlinkRefundPair } from '@/lib/budget-store';
+import { findRefundPairs } from './RefundMatcher';
 
 interface DayBoxProps {
   date: Date;
@@ -93,24 +94,15 @@ export function DayBox({ date, dateStr, entries, customCategories, allEntries, r
     );
   };
 
-  /** After adding a credit, check if a matching spend exists for refund suggestion */
+  /** After adding a credit, check if a matching spend exists using the shared scoring algorithm */
   const checkRefundMatch = (newEntry: SpendEntry) => {
     if (newEntry.type !== 'credit') return;
-    // Look for unlinked spend entries with same or similar merchant note
-    const candidates = allEntries.filter(e =>
-      (e.type ?? 'spend') === 'spend' &&
-      !e.refundPairId &&
-      e.id !== newEntry.id &&
-      (
-        (e.note && newEntry.note && e.note.toLowerCase().includes(newEntry.note.toLowerCase().split(' ')[0])) ||
-        e.category === newEntry.category.replace(' Refund', '').replace('Shopping', 'Groceries') ||
-        Math.abs(e.amount - newEntry.amount) < 0.01
-      )
-    );
-    if (candidates.length > 0) {
-      // Pick closest match by amount
-      const best = candidates.sort((a, b) => Math.abs(a.amount - newEntry.amount) - Math.abs(b.amount - newEntry.amount))[0];
-      setRefundSuggestion({ spendEntry: best, creditEntry: newEntry });
+    // Combine allEntries with the new entry and run the matcher
+    const allWithNew = [...allEntries, newEntry];
+    const pairs = findRefundPairs(allWithNew);
+    const match = pairs.find(p => p.credit.id === newEntry.id || p.spend.id === newEntry.id);
+    if (match) {
+      setRefundSuggestion({ spendEntry: match.spend, creditEntry: match.credit });
     }
   };
 
