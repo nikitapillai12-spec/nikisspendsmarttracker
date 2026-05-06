@@ -233,8 +233,8 @@ function parseAmex(text: string, refYear: number, refMonth: number): Omit<Parsed
   const txLineRe = /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2})\s+(.*)/i;
   // Standalone amount line: just a number like "79.56" or "79.56" with optional CR
   const amountLineRe = /^([\d,]+\.\d{2})\s*(CR)?$/i;
-  // Amount at end of description: "...LONDON 79.56" or "...LONDON 79.56 CR"
-  const amountInlineRe = /\s+([\d,]+\.\d{2})\s*(CR)?\s*$/i;
+  // Amount at end of description (including column-spaced: "...LONDON     79.56")
+  const amountInlineRe = /\s{1,}([\d,]+\.\d{2})\s*(CR)?\s*$/i;
 
   let i = 0;
   while (i < lines.length) {
@@ -467,15 +467,18 @@ export function PdfImport({ trigger }: { trigger: React.ReactNode }) {
           {/* Paste text area */}
           {mode === 'paste' && (
             <div className="space-y-4">
-              {/* Step-by-step instructions — big, visual, hard to miss */}
+              {/* Step-by-step instructions */}
               <div className="rounded-xl border-2 border-primary/20 bg-primary/5 p-4">
-                <p className="font-display font-bold text-sm text-foreground mb-3">How to get text from your bank PDF:</p>
+                <p className="font-display font-bold text-sm text-foreground mb-1">How to copy from your AMEX PDF (Chrome/Safari):</p>
+                <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">
+                  ⚠️ <strong>AMEX tip:</strong> Do <em>not</em> use Cmd+A — it misses the amounts column. Select <em>just the transaction rows</em> by clicking and dragging from the first date to the last amount.
+                </p>
                 <div className="space-y-2">
                   {[
-                    { step: '1', icon: '📂', text: 'Open your PDF statement in Chrome or Safari (drag it into the browser window)' },
-                    { step: '2', icon: '🖱️', text: <>Click anywhere on the page, then press <kbd className="bg-white border border-border px-1.5 py-0.5 rounded text-[11px] font-mono font-semibold">Cmd+A</kbd> on Mac or <kbd className="bg-white border border-border px-1.5 py-0.5 rounded text-[11px] font-mono font-semibold">Ctrl+A</kbd> on Windows to select all text</> },
-                    { step: '3', icon: '📋', text: <>Press <kbd className="bg-white border border-border px-1.5 py-0.5 rounded text-[11px] font-mono font-semibold">Cmd+C</kbd> or <kbd className="bg-white border border-border px-1.5 py-0.5 rounded text-[11px] font-mono font-semibold">Ctrl+C</kbd> to copy</> },
-                    { step: '4', icon: '⬇️', text: 'Come back here and paste into the box below (Cmd+V / Ctrl+V), then click Parse' },
+                    { step: '1', icon: '📂', text: 'Open your PDF statement in Chrome (drag it into the browser window or File → Open)' },
+                    { step: '2', icon: '🖱️', text: 'Click just before "Jan 1" (or the first transaction date) and drag all the way to the last amount on the final row' },
+                    { step: '3', icon: '📋', text: <>Press <kbd className="bg-white border border-border px-1.5 py-0.5 rounded text-[11px] font-mono font-semibold">Cmd+C</kbd> (Mac) or <kbd className="bg-white border border-border px-1.5 py-0.5 rounded text-[11px] font-mono font-semibold">Ctrl+C</kbd> (Windows) to copy the selected text</> },
+                    { step: '4', icon: '⬇️', text: 'Come back here, click the box below, and paste (Cmd+V / Ctrl+V), then click Parse' },
                   ].map(({ step, icon, text }) => (
                     <div key={step} className="flex items-start gap-3">
                       <div className="shrink-0 w-6 h-6 rounded-full bg-primary text-white text-xs font-black flex items-center justify-center mt-0.5">{step}</div>
@@ -486,7 +489,7 @@ export function PdfImport({ trigger }: { trigger: React.ReactNode }) {
                   ))}
                 </div>
                 <p className="text-[11px] text-muted-foreground mt-3 pl-9">
-                  Works for AMEX, Natwest, Lloyds, Barclays. On iPhone: open PDF in Files app → share → Copy to Chrome.
+                  Also works for Natwest, Lloyds, Barclays. On iPhone: open PDF in Files app → share → Copy to Chrome, then select the table.
                 </p>
               </div>
 
