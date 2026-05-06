@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      backup_snapshots: {
+        Row: {
+          created_at: string
+          data: Json
+          id: string
+          snapshot_date: string
+          vault_id: string
+        }
+        Insert: {
+          created_at?: string
+          data: Json
+          id?: string
+          snapshot_date: string
+          vault_id: string
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          id?: string
+          snapshot_date?: string
+          vault_id?: string
+        }
+        Relationships: []
+      }
       category_budgets: {
         Row: {
           amount: number
