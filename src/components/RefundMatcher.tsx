@@ -1,10 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Link, Check, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { Link, Check, X, ChevronDown, ChevronUp, Bell } from 'lucide-react';
 import { SpendEntry, BudgetData } from '@/lib/budget-types';
 import { linkRefundPair } from '@/lib/budget-store';
 import { Button } from '@/components/ui/button';
-import { format } from 'date-fns';
 
 interface RefundPair {
   id: string;
@@ -20,12 +19,11 @@ interface RefundPair {
 function scoreMatch(spend: SpendEntry, credit: SpendEntry): { score: number; reason: string } | null {
   if ((spend.type ?? 'spend') !== 'spend') return null;
   if (credit.type !== 'credit') return null;
-  if (spend.refundPairId || credit.refundPairId) return null; // already linked
+  if (spend.refundPairId || credit.refundPairId) return null;
 
   let score = 0;
   const reasons: string[] = [];
 
-  // Same amount = strong signal
   const amountDiff = Math.abs(spend.amount - credit.amount);
   if (amountDiff < 0.01) {
     score += 40;
@@ -34,10 +32,9 @@ function scoreMatch(spend: SpendEntry, credit: SpendEntry): { score: number; rea
     score += 20;
     reasons.push('similar amount');
   } else if (credit.amount > spend.amount) {
-    return null; // credit larger than spend — unlikely refund
+    return null;
   }
 
-  // Note/merchant similarity
   const spendNote = (spend.note || '').toLowerCase().trim();
   const creditNote = (credit.note || '').toLowerCase().trim();
   if (spendNote && creditNote) {
@@ -45,7 +42,6 @@ function scoreMatch(spend: SpendEntry, credit: SpendEntry): { score: number; rea
       score += 40;
       reasons.push(`same merchant "${spend.note}"`);
     } else {
-      // Check if first word matches (e.g. "Zara Oxford St" vs "Zara")
       const spendWords = spendNote.split(/\s+/);
       const creditWords = creditNote.split(/\s+/);
       const commonWords = spendWords.filter(w => w.length > 3 && creditWords.some(cw => cw.includes(w) || w.includes(cw)));
@@ -55,11 +51,9 @@ function scoreMatch(spend: SpendEntry, credit: SpendEntry): { score: number; rea
       }
     }
   } else if (spendNote && !creditNote) {
-    // Credit has no note — category match is weaker
     score += 5;
   }
 
-  // Category match (e.g. Groceries spend → Shopping Refund credit, or same category)
   const spendCat = spend.category.toLowerCase();
   const creditCat = credit.category.toLowerCase();
   if (spendCat === creditCat) {
@@ -70,7 +64,6 @@ function scoreMatch(spend: SpendEntry, credit: SpendEntry): { score: number; rea
     reasons.push('Shopping Refund credit');
   }
 
-  // Date proximity — within 60 days
   const daysDiff = Math.abs(new Date(spend.date).getTime() - new Date(credit.date).getTime()) / (1000 * 60 * 60 * 24);
   if (daysDiff <= 7) {
     score += 20;
@@ -81,16 +74,14 @@ function scoreMatch(spend: SpendEntry, credit: SpendEntry): { score: number; rea
   } else if (daysDiff <= 60) {
     score += 3;
   } else {
-    return null; // too far apart
+    return null;
   }
 
-  // Credit must come after spend (refunds come after purchase)
   if (new Date(credit.date) < new Date(spend.date)) {
-    score -= 15; // penalise but don't exclude (data entry order may vary)
+    score -= 15;
   }
 
   if (score < 30) return null;
-
   return { score, reason: reasons.join(' · ') };
 }
 
@@ -103,19 +94,15 @@ export function findRefundPairs(entries: SpendEntry[]): RefundPair[] {
   const usedSpendIds = new Set<string>();
   const usedCreditIds = new Set<string>();
 
-  // Build all candidate matches sorted by score desc
   const candidates: Array<{ spend: SpendEntry; credit: SpendEntry; score: number; reason: string }> = [];
   for (const spend of spends) {
     for (const credit of credits) {
       const result = scoreMatch(spend, credit);
-      if (result) {
-        candidates.push({ spend, credit, score: result.score, reason: result.reason });
-      }
+      if (result) candidates.push({ spend, credit, score: result.score, reason: result.reason });
     }
   }
   candidates.sort((a, b) => b.score - a.score);
 
-  // Greedy match — each entry used at most once
   for (const c of candidates) {
     if (usedSpendIds.has(c.spend.id) || usedCreditIds.has(c.credit.id)) continue;
     usedSpendIds.add(c.spend.id);
@@ -146,22 +133,23 @@ export function RefundMatcher({ data, onDataChange }: Props) {
   const [confirmed, setConfirmed] = useState<Set<string>>(new Set());
   const [rejected, setRejected] = useState<Set<string>>(new Set());
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [done, setDone] = useState(false);
+  const [scanned, setScanned] = useState(false);
 
+  // Scan entries once data is loaded
   useEffect(() => {
     if (data.entries.length === 0) return;
-    if (done) return;
+    if (scanned) return;
     const found = findRefundPairs(data.entries);
     if (found.length > 0) {
       setPairs(found);
-      // Pre-confirm high-confidence pairs, leave medium for manual review
       const preConfirmed = new Set(found.filter(p => p.confidence === 'high').map(p => p.id));
       setConfirmed(preConfirmed);
       setOpen(true);
     }
-  }, [data.entries.length]);
+    setScanned(true);
+  }, [data.entries.length, scanned]);
 
-  const toggle = (id: string, action: 'confirm' | 'reject') => {
+  const toggle = useCallback((id: string, action: 'confirm' | 'reject') => {
     if (action === 'confirm') {
       setConfirmed(prev => { const s = new Set(prev); s.add(id); return s; });
       setRejected(prev => { const s = new Set(prev); s.delete(id); return s; });
@@ -169,200 +157,268 @@ export function RefundMatcher({ data, onDataChange }: Props) {
       setRejected(prev => { const s = new Set(prev); s.add(id); return s; });
       setConfirmed(prev => { const s = new Set(prev); s.delete(id); return s; });
     }
-  };
+  }, []);
 
-  const toggleExpand = (id: string) => {
+  const toggleExpand = useCallback((id: string) => {
     setExpanded(prev => {
       const s = new Set(prev);
       if (s.has(id)) s.delete(id); else s.add(id);
       return s;
     });
-  };
+  }, []);
 
-  const handleApplyAll = () => {
+  const handleApplyAll = useCallback(() => {
     let latest = data;
     for (const pair of pairs) {
       if (confirmed.has(pair.id)) {
         latest = linkRefundPair(pair.spend.id, pair.credit.id);
       }
     }
+    // Remove confirmed and rejected pairs from the list; keep pending ones
+    setPairs(prev => prev.filter(p => !confirmed.has(p.id) && !rejected.has(p.id)));
+    setConfirmed(new Set());
+    setRejected(new Set());
     onDataChange(latest);
-    setDone(true);
     setOpen(false);
-  };
+  }, [data, pairs, confirmed, rejected, onDataChange]);
 
   const confirmedCount = confirmed.size;
   const pendingCount = pairs.length - confirmed.size - rejected.size;
-
-  if (!open) return null;
+  // Unreviewed pairs = not yet confirmed or rejected
+  const unreviewedCount = pairs.filter(p => !confirmed.has(p.id) && !rejected.has(p.id)).length;
 
   return (
-    <AnimatePresence>
-      {open && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
-        >
-          <motion.div
-            initial={{ scale: 0.92, opacity: 0, y: 20 }}
-            animate={{ scale: 1, opacity: 1, y: 0 }}
-            exit={{ scale: 0.92, opacity: 0 }}
-            className="bg-card rounded-2xl border-2 border-border w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col"
-            style={{ boxShadow: '0 24px 60px -12px hsl(230 25% 12% / 0.35)' }}
+    <>
+      {/* Persistent notification bell — always visible when there are pending pairs */}
+      <AnimatePresence>
+        {!open && pairs.length > 0 && (
+          <motion.button
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0, opacity: 0 }}
+            onClick={() => setOpen(true)}
+            className="fixed bottom-6 right-6 z-40 flex items-center gap-2 px-4 py-3 rounded-full bg-primary text-white font-semibold text-sm shadow-lg hover:bg-primary/90 transition-colors"
+            style={{ boxShadow: '0 8px 24px -4px hsl(350 80% 52% / 0.5)' }}
           >
-            {/* Header */}
-            <div className="p-5 border-b border-border" style={{ borderTop: '4px solid hsl(var(--primary))' }}>
-              <div className="flex items-center gap-3 mb-1">
-                <div className="w-8 h-8 rounded-lg bg-primary/15 flex items-center justify-center">
-                  <Link className="w-4 h-4 text-primary" />
+            <Bell className="w-4 h-4" />
+            {unreviewedCount > 0 ? (
+              <span>{unreviewedCount} refund match{unreviewedCount !== 1 ? 'es' : ''} to review</span>
+            ) : (
+              <span>Review refund matches</span>
+            )}
+            {unreviewedCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-white text-primary text-[11px] font-black flex items-center justify-center">
+                {unreviewedCount}
+              </span>
+            )}
+          </motion.button>
+        )}
+      </AnimatePresence>
+
+      {/* Full-screen confirmation dialog */}
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}
+            onClick={(e) => { if (e.target === e.currentTarget) setOpen(false); }}
+          >
+            <motion.div
+              initial={{ scale: 0.92, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.92, opacity: 0 }}
+              style={{ background: 'white', borderRadius: '16px', border: '2px solid #e2e8f0', width: '100%', maxWidth: '680px', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 60px -12px rgba(0,0,0,0.4)' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div style={{ padding: '20px', borderBottom: '1px solid #e2e8f0', borderTop: '4px solid hsl(350, 80%, 52%)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'hsl(350 80% 52% / 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Link style={{ width: '16px', height: '16px', color: 'hsl(350, 80%, 52%)' }} />
+                  </div>
+                  <h2 style={{ fontFamily: 'Rubik, sans-serif', fontWeight: 700, fontSize: '18px', margin: 0 }}>
+                    Possible Refund Matches Found
+                  </h2>
                 </div>
-                <h2 className="font-display text-xl">Possible Refund Matches Found</h2>
+                <p style={{ fontSize: '13px', color: '#64748b', margin: 0 }}>
+                  We scanned your {data.entries.length} transactions and found <strong>{pairs.length} possible spend/refund pair{pairs.length !== 1 ? 's' : ''}</strong>. Confirm to net them off, or reject to keep separate. <strong>Nothing changes until you click "Apply".</strong>
+                </p>
+                {unreviewedCount > 0 && (
+                  <p style={{ fontSize: '12px', color: 'hsl(38, 90%, 42%)', fontWeight: 600, marginTop: '6px', marginBottom: 0 }}>
+                    ⚠ {unreviewedCount} pair{unreviewedCount !== 1 ? 's' : ''} still need your decision
+                  </p>
+                )}
               </div>
-              <p className="text-sm text-muted-foreground">
-                We scanned your {data.entries.length} transactions and found <strong>{pairs.length} possible spend/refund pair{pairs.length !== 1 ? 's' : ''}</strong>. Review each one — confirm to net them off, or reject to leave them separate. Nothing changes until you click "Apply confirmed matches".
-              </p>
-              {pendingCount > 0 && (
-                <p className="text-xs text-budget-warning mt-1 font-semibold">⚠ {pendingCount} pair{pendingCount !== 1 ? 's' : ''} still need your review</p>
-              )}
-            </div>
 
-            {/* Pairs list */}
-            <div className="overflow-y-auto flex-1 divide-y divide-border">
-              {pairs.map((pair) => {
-                const isConfirmed = confirmed.has(pair.id);
-                const isRejected = rejected.has(pair.id);
-                const isPending = !isConfirmed && !isRejected;
-                const isExp = expanded.has(pair.id);
+              {/* Pairs list */}
+              <div style={{ overflowY: 'auto', flex: 1 }}>
+                {pairs.map((pair) => {
+                  const isConfirmed = confirmed.has(pair.id);
+                  const isRejected = rejected.has(pair.id);
+                  const isExp = expanded.has(pair.id);
 
-                return (
-                  <div
-                    key={pair.id}
-                    className={`p-4 transition-colors ${isConfirmed ? 'bg-budget-under/8' : isRejected ? 'bg-muted/40' : 'bg-background'}`}
-                  >
-                    {/* Summary row */}
-                    <div className="flex items-start gap-3">
-                      {/* Confidence badge */}
-                      <span className={`shrink-0 mt-0.5 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${pair.confidence === 'high' ? 'bg-budget-under/20 text-budget-under' : 'bg-budget-warning/20 text-budget-warning'}`}>
-                        {pair.confidence}
-                      </span>
+                  return (
+                    <div
+                      key={pair.id}
+                      style={{
+                        padding: '16px',
+                        borderBottom: '1px solid #e2e8f0',
+                        background: isConfirmed ? 'hsl(145 55% 38% / 0.06)' : isRejected ? '#f8fafc' : 'white',
+                      }}
+                    >
+                      {/* Top row */}
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: '10px' }}>
+                        {/* Confidence badge */}
+                        <span style={{
+                          flexShrink: 0,
+                          fontSize: '10px',
+                          fontWeight: 700,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.08em',
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          marginTop: '2px',
+                          background: pair.confidence === 'high' ? 'hsl(145 55% 38% / 0.15)' : 'hsl(38 90% 52% / 0.15)',
+                          color: pair.confidence === 'high' ? 'hsl(145, 55%, 32%)' : 'hsl(38, 90%, 35%)',
+                        }}>
+                          {pair.confidence}
+                        </span>
 
-                      {/* Pair description */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex flex-wrap items-center gap-1.5 text-sm font-semibold">
-                          <span className="text-budget-over">
-                            -{pair.spend.note || pair.spend.category} £{pair.spend.amount.toFixed(2)}
-                          </span>
-                          <span className="text-muted-foreground text-xs">({pair.spend.date})</span>
-                          <span className="text-muted-foreground">↔</span>
-                          <span className="text-budget-under">
-                            +{pair.credit.note || pair.credit.category} £{pair.credit.amount.toFixed(2)}
-                          </span>
-                          <span className="text-muted-foreground text-xs">({pair.credit.date})</span>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: '14px', fontWeight: 600, display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+                            <span style={{ color: 'hsl(5, 75%, 48%)' }}>
+                              -{pair.spend.note || pair.spend.category} £{pair.spend.amount.toFixed(2)}
+                            </span>
+                            <span style={{ color: '#94a3b8', fontSize: '12px' }}>({pair.spend.date})</span>
+                            <span style={{ color: '#94a3b8' }}>↔</span>
+                            <span style={{ color: 'hsl(145, 55%, 38%)' }}>
+                              +{pair.credit.note || pair.credit.category} £{pair.credit.amount.toFixed(2)}
+                            </span>
+                            <span style={{ color: '#94a3b8', fontSize: '12px' }}>({pair.credit.date})</span>
+                          </div>
+                          <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                            <span>Match: {pair.reason}</span>
+                            <span style={{ fontWeight: 700, color: pair.isFullRefund ? 'hsl(145, 55%, 38%)' : 'hsl(350, 80%, 52%)' }}>
+                              {pair.isFullRefund ? '✓ Full refund — net: £0' : `Partial refund — net: £${pair.netAmount.toFixed(2)}`}
+                            </span>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2 mt-1 flex-wrap">
-                          <span className="text-xs text-muted-foreground">Match reason: {pair.reason}</span>
-                          <span className="text-[11px] font-bold">
-                            {pair.isFullRefund
-                              ? <span className="text-budget-under">✓ Full refund — net: £0</span>
-                              : <span className="text-primary">Partial refund — net: £{pair.netAmount.toFixed(2)}</span>
-                            }
-                          </span>
-                        </div>
+
+                        <button
+                          onClick={() => toggleExpand(pair.id)}
+                          style={{ flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: '4px' }}
+                        >
+                          {isExp ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                        </button>
                       </div>
 
-                      {/* Expand toggle */}
-                      <button onClick={() => toggleExpand(pair.id)} className="text-muted-foreground hover:text-foreground shrink-0">
-                        {isExp ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                      </button>
-                    </div>
-
-                    {/* Expanded detail */}
-                    <AnimatePresence>
+                      {/* Expanded detail */}
                       {isExp && (
-                        <motion.div
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: 'auto', opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          className="overflow-hidden"
-                        >
-                          <div className="mt-3 grid grid-cols-2 gap-3 text-xs">
-                            <div className="rounded-lg border border-budget-over/30 bg-budget-over/5 p-3">
-                              <div className="font-bold text-budget-over mb-1">SPEND</div>
-                              <div><span className="text-muted-foreground">Date:</span> {pair.spend.date}</div>
-                              <div><span className="text-muted-foreground">Amount:</span> £{pair.spend.amount.toFixed(2)}</div>
-                              <div><span className="text-muted-foreground">Category:</span> {pair.spend.category}</div>
-                              {pair.spend.note && <div><span className="text-muted-foreground">Merchant:</span> {pair.spend.note}</div>}
-                            </div>
-                            <div className="rounded-lg border border-budget-under/30 bg-budget-under/5 p-3">
-                              <div className="font-bold text-budget-under mb-1">CREDIT / REFUND</div>
-                              <div><span className="text-muted-foreground">Date:</span> {pair.credit.date}</div>
-                              <div><span className="text-muted-foreground">Amount:</span> £{pair.credit.amount.toFixed(2)}</div>
-                              <div><span className="text-muted-foreground">Category:</span> {pair.credit.category}</div>
-                              {pair.credit.note && <div><span className="text-muted-foreground">Merchant:</span> {pair.credit.note}</div>}
-                            </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
+                          <div style={{ borderRadius: '8px', border: '1px solid hsl(5 75% 48% / 0.25)', background: 'hsl(5 75% 48% / 0.04)', padding: '10px', fontSize: '12px' }}>
+                            <div style={{ fontWeight: 700, color: 'hsl(5, 75%, 48%)', marginBottom: '6px' }}>SPEND</div>
+                            <div><span style={{ color: '#64748b' }}>Date: </span>{pair.spend.date}</div>
+                            <div><span style={{ color: '#64748b' }}>Amount: </span>£{pair.spend.amount.toFixed(2)}</div>
+                            <div><span style={{ color: '#64748b' }}>Category: </span>{pair.spend.category}</div>
+                            {pair.spend.note && <div><span style={{ color: '#64748b' }}>Merchant: </span>{pair.spend.note}</div>}
                           </div>
-                        </motion.div>
+                          <div style={{ borderRadius: '8px', border: '1px solid hsl(145 55% 38% / 0.25)', background: 'hsl(145 55% 38% / 0.04)', padding: '10px', fontSize: '12px' }}>
+                            <div style={{ fontWeight: 700, color: 'hsl(145, 55%, 38%)', marginBottom: '6px' }}>CREDIT / REFUND</div>
+                            <div><span style={{ color: '#64748b' }}>Date: </span>{pair.credit.date}</div>
+                            <div><span style={{ color: '#64748b' }}>Amount: </span>£{pair.credit.amount.toFixed(2)}</div>
+                            <div><span style={{ color: '#64748b' }}>Category: </span>{pair.credit.category}</div>
+                            {pair.credit.note && <div><span style={{ color: '#64748b' }}>Merchant: </span>{pair.credit.note}</div>}
+                          </div>
+                        </div>
                       )}
-                    </AnimatePresence>
 
-                    {/* Action buttons */}
-                    <div className="flex gap-2 mt-3">
-                      <button
-                        onClick={() => toggle(pair.id, 'confirm')}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                          isConfirmed
-                            ? 'bg-budget-under text-white border-budget-under'
-                            : 'border-budget-under/40 text-budget-under hover:bg-budget-under/10'
-                        }`}
-                      >
-                        <Check className="w-3.5 h-3.5" />
-                        {isConfirmed ? 'Confirmed' : 'Yes, these match — net them off'}
-                      </button>
-                      <button
-                        onClick={() => toggle(pair.id, 'reject')}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                          isRejected
-                            ? 'bg-muted text-muted-foreground border-muted'
-                            : 'border-border text-muted-foreground hover:bg-muted/40'
-                        }`}
-                      >
-                        <X className="w-3.5 h-3.5" />
-                        {isRejected ? 'Rejected' : 'No, keep separate'}
-                      </button>
+                      {/* Confirm / Reject buttons — plain HTML buttons, no Tailwind, guaranteed clickable */}
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                        <button
+                          onClick={() => toggle(pair.id, 'confirm')}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '8px 14px',
+                            borderRadius: '8px',
+                            border: `2px solid hsl(145, 55%, 38%)`,
+                            background: isConfirmed ? 'hsl(145, 55%, 38%)' : 'transparent',
+                            color: isConfirmed ? 'white' : 'hsl(145, 55%, 38%)',
+                            fontSize: '13px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            transition: 'all 0.15s',
+                          }}
+                        >
+                          <Check size={14} />
+                          {isConfirmed ? 'Confirmed ✓' : 'Yes — net these off'}
+                        </button>
+                        <button
+                          onClick={() => toggle(pair.id, 'reject')}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '8px 14px',
+                            borderRadius: '8px',
+                            border: `2px solid #e2e8f0`,
+                            background: isRejected ? '#e2e8f0' : 'transparent',
+                            color: isRejected ? '#475569' : '#94a3b8',
+                            fontSize: '13px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            transition: 'all 0.15s',
+                          }}
+                        >
+                          <X size={14} />
+                          {isRejected ? 'Kept separate' : 'No — keep separate'}
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
 
-            {/* Footer */}
-            <div className="p-4 border-t border-border bg-secondary/40 flex items-center justify-between gap-4 flex-wrap">
-              <div className="text-sm text-muted-foreground">
-                <span className="font-semibold text-budget-under">{confirmedCount} confirmed</span>
-                {' · '}
-                <span className="font-semibold text-destructive">{rejected.size} rejected</span>
-                {pendingCount > 0 && <span className="text-budget-warning"> · {pendingCount} pending</span>}
+              {/* Footer */}
+              <div style={{ padding: '16px', borderTop: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                <div style={{ fontSize: '13px', color: '#64748b' }}>
+                  <span style={{ fontWeight: 700, color: 'hsl(145, 55%, 38%)' }}>{confirmedCount} confirmed</span>
+                  {' · '}
+                  <span style={{ fontWeight: 700, color: '#94a3b8' }}>{rejected.size} rejected</span>
+                  {unreviewedCount > 0 && <span style={{ color: 'hsl(38, 90%, 42%)', fontWeight: 600 }}> · {unreviewedCount} pending</span>}
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    onClick={() => setOpen(false)}
+                    style={{ padding: '8px 16px', borderRadius: '8px', border: '2px solid #e2e8f0', background: 'white', color: '#64748b', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
+                  >
+                    Skip for now
+                  </button>
+                  <button
+                    onClick={handleApplyAll}
+                    disabled={confirmedCount === 0}
+                    style={{
+                      padding: '8px 18px',
+                      borderRadius: '8px',
+                      border: 'none',
+                      background: confirmedCount === 0 ? '#e2e8f0' : 'hsl(350, 80%, 52%)',
+                      color: confirmedCount === 0 ? '#94a3b8' : 'white',
+                      fontSize: '13px',
+                      fontWeight: 700,
+                      cursor: confirmedCount === 0 ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    ✓ Apply {confirmedCount} confirmed match{confirmedCount !== 1 ? 'es' : ''}
+                  </button>
+                </div>
               </div>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => { setDone(true); setOpen(false); }}>
-                  Skip for now
-                </Button>
-                <Button
-                  size="sm"
-                  disabled={confirmedCount === 0}
-                  onClick={handleApplyAll}
-                  className="bg-primary text-white hover:bg-primary/90"
-                >
-                  <Check className="w-3.5 h-3.5 mr-1" />
-                  Apply {confirmedCount} confirmed match{confirmedCount !== 1 ? 'es' : ''}
-                </Button>
-              </div>
-            </div>
+            </motion.div>
           </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+        )}
+      </AnimatePresence>
+    </>
   );
 }
