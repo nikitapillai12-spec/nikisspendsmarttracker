@@ -525,3 +525,140 @@ export function deleteInvestmentPlatform(name: string): BudgetData {
     .then(({ error }) => { if (error) console.error('deleteInvestmentPlatform sync', error); });
   return cache;
 }
+
+// ---------- Backup / Restore ----------
+
+/** Returns a full snapshot of the current vault data, suitable for JSON export. */
+export function exportSnapshot(): BudgetData & { _meta: { exportedAt: string; vaultId: string } } {
+  return {
+    ...cache,
+    _meta: {
+      exportedAt: new Date().toISOString(),
+      vaultId: getStoredVaultId() ?? '',
+    },
+  };
+}
+
+/** Saves today's snapshot to Cloud (one snapshot per vault per day). */
+export async function saveDailyBackupToCloud(): Promise<{ saved: boolean; date: string }> {
+  const vid = getStoredVaultId();
+  const today = new Date().toISOString().slice(0, 10);
+  if (!vid) return { saved: false, date: today };
+  const snap = exportSnapshot();
+  const { error } = await supabase.from('backup_snapshots').upsert(
+    { vault_id: vid, snapshot_date: today, data: snap as any },
+    { onConflict: 'vault_id,snapshot_date' }
+  );
+  if (error) {
+    console.error('saveDailyBackupToCloud', error);
+    return { saved: false, date: today };
+  }
+  return { saved: true, date: today };
+}
+
+export interface BackupListItem { id: string; date: string; createdAt: string; }
+
+export async function listCloudBackups(): Promise<BackupListItem[]> {
+  const vid = getStoredVaultId();
+  if (!vid) return [];
+  const { data, error } = await supabase
+    .from('backup_snapshots')
+    .select('id, snapshot_date, created_at')
+    .eq('vault_id', vid)
+    .order('snapshot_date', { ascending: false })
+    .limit(60);
+  if (error) { console.error('listCloudBackups', error); return []; }
+  return (data || []).map(r => ({ id: r.id, date: r.snapshot_date, createdAt: r.created_at }));
+}
+
+export async function fetchCloudBackup(id: string): Promise<BudgetData | null> {
+  const { data, error } = await supabase
+    .from('backup_snapshots').select('data').eq('id', id).maybeSingle();
+  if (error || !data) { console.error('fetchCloudBackup', error); return null; }
+  return data.data as BudgetData;
+}
+
+/** Restore a backup payload into the cloud DB for the current vault.
+ *  Existing rows with conflicting ids/keys are upserted (overwritten). */
+export async function restoreFromBackup(payload: BudgetData): Promise<boolean> {
+  const vid = getStoredVaultId();
+  if (!vid) return false;
+  try {
+    if (payload.customCategories?.length) {
+      await supabase.from('custom_categories').upsert(
+        payload.customCategories.map(c => ({
+          vault_id: vid, name: c.name, emoji: c.emoji, color: c.color, type: c.type ?? 'spend',
+        })),
+        { onConflict: 'vault_id,name' }
+      );
+    }
+    if (payload.monthlyBudgets?.length) {
+      await supabase.from('monthly_budgets').upsert(
+        payload.monthlyBudgets.map(b => ({ vault_id: vid, month: b.month, amount: b.amount })),
+        { onConflict: 'vault_id,month' }
+      );
+    }
+    if (payload.categoryBudgets?.length) {
+      await supabase.from('category_budgets').upsert(
+        payload.categoryBudgets.map(b => ({
+          vault_id: vid, category: b.category, month: b.month, amount: b.amount,
+        })),
+        { onConflict: 'vault_id,category,month' }
+      );
+    }
+    if (payload.recurringPayments?.length) {
+      await supabase.from('recurring_payments').upsert(
+        payload.recurringPayments.map(p => ({
+          id: p.id, vault_id: vid, label: p.label, amount: p.amount, category: p.category,
+          start_month: p.startMonth, end_month: p.endMonth ?? null, active: p.active,
+        })),
+        { onConflict: 'id' }
+      );
+    }
+    if (payload.investmentPlatforms?.length) {
+      await supabase.from('investment_platforms').upsert(
+        payload.investmentPlatforms.map(name => ({ vault_id: vid, name })),
+        { onConflict: 'vault_id,name' }
+      );
+    }
+    if (payload.investmentEntries?.length) {
+      await supabase.from('investment_entries').upsert(
+        payload.investmentEntries.map(e => ({
+          id: e.id, vault_id: vid, amount: e.amount, platform: e.platform,
+          entry_date: e.date, note: e.note ?? null,
+        })),
+        { onConflict: 'id' }
+      );
+    }
+    if (payload.entries?.length) {
+      // Chunk to avoid oversized payloads
+      const rows = payload.entries.map(e => ({
+        id: e.id, vault_id: vid, entry_date: e.date, amount: e.amount,
+        category: e.category, note: e.note ?? null, type: e.type ?? 'spend',
+      }));
+      const CHUNK = 500;
+      for (let i = 0; i < rows.length; i += CHUNK) {
+        const slice = rows.slice(i, i + CHUNK);
+        const { error } = await supabase.from('spend_entries').upsert(slice, { onConflict: 'id' });
+        if (error) { console.error('restoreFromBackup entries chunk', error); return false; }
+      }
+    }
+    await refetchAll();
+    return true;
+  } catch (e) {
+    console.error('restoreFromBackup failed', e);
+    return false;
+  }
+}
+
+/** Triggers the "save once a day" cloud backup. Safe to call on every app load;
+ *  the upsert keys make repeat calls a no-op for the same date. */
+export async function maybeRunDailyBackup(): Promise<void> {
+  const vid = getStoredVaultId();
+  if (!vid) return;
+  const today = new Date().toISOString().slice(0, 10);
+  const flagKey = `spendsmart_last_backup_${vid}`;
+  if (localStorage.getItem(flagKey) === today) return;
+  const res = await saveDailyBackupToCloud();
+  if (res.saved) localStorage.setItem(flagKey, today);
+}
