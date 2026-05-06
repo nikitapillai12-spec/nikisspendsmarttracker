@@ -75,3 +75,26 @@ export function recurringDisplayDateInWeek(weekStart: Date, monthKey: string): s
   if (inMonth.length === 0) return null;
   return formatDate(inMonth[inMonth.length - 1]);
 }
+
+/**
+ * Returns the representative date for each week that touches a given month.
+ * Used to create per-week split entries for Salary, Rent, Utilities, Subscriptions.
+ * The representative date is the last day of each week that still falls in that month.
+ */
+export function getWeekRepresentativeDatesForMonth(monthKey: string): string[] {
+  const first = new Date(monthKey + '-01');
+  const last = endOfMonth(first);
+  const seenWeeks = new Set<string>();
+  const result: string[] = [];
+  for (let d = new Date(first); d <= last; d = addDays(d, 1)) {
+    const ws = format(getWeekStart(d), 'yyyy-MM-dd');
+    if (!seenWeeks.has(ws)) {
+      seenWeeks.add(ws);
+      // The representative date = last day of this week still in the month
+      const weekDays = Array.from({ length: 7 }, (_, i) => addDays(new Date(ws), i));
+      const inMonth = weekDays.filter(wd => wd >= first && wd <= last);
+      if (inMonth.length > 0) result.push(formatDate(inMonth[inMonth.length - 1]));
+    }
+  }
+  return result;
+}

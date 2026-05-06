@@ -15,7 +15,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { BackupSettings } from '@/components/BackupSettings';
-import mcmLogo from '@/assets/mcm-logo.png';
+import { PdfImport } from '@/components/PdfImport';
+import { FileText } from 'lucide-react';
 
 type Tab = 'weekly' | 'timeseries';
 
@@ -26,56 +27,60 @@ const Index = () => {
   useEffect(() => {
     setData({ ...getAll() });
     const unsub = subscribeStore(d => setData({ ...d }));
-    // Defensive re-hydration in case Index mounted before PasscodeGate's initStore
-    // finished, or the cache was cleared (e.g. HMR). Safe to call multiple times.
     if (getStoredVaultId()) {
       initStore().then(d => {
         setData({ ...d });
-        // Fire-and-forget daily auto-backup; no-op if already done today
         maybeRunDailyBackup();
       });
     }
     return () => { unsub(); };
   }, []);
 
-  const refreshData = (newData: BudgetData) => {
-    setData({ ...newData });
-  };
+  const refreshData = (newData: BudgetData) => setData({ ...newData });
 
   return (
     <AutoUnlock>
-    <div className="min-h-screen mcm-bg relative overflow-x-hidden text-[17px]">
-      {/* Decorative MCM shapes — organic atomic forms, sparse */}
-      <div className="mcm-blob top-24 -left-12 w-40 h-24 rounded-[50%] bg-[hsl(var(--mcm-mustard))]/25 rotate-[-12deg]" />
-      <div className="mcm-blob top-[28rem] -right-8 w-28 h-28 rounded-full bg-[hsl(var(--mcm-teal))]/20" />
-      <div className="mcm-blob bottom-24 left-10 w-0 h-0 border-l-[28px] border-l-transparent border-r-[28px] border-r-transparent border-b-[48px] border-b-[hsl(var(--mcm-terracotta))]/35" />
-      <div className="mcm-blob top-[60rem] right-16 w-32 h-12 rounded-full bg-[hsl(var(--mcm-olive))]/20 rotate-12" />
+    <div className="min-h-screen mcm-bg relative overflow-x-hidden">
+
+      {/* Memphis geometric accent shapes — bold, sparse, editorial */}
+      {/* Top-left: bold yellow rectangle block */}
+      <div className="mcm-blob top-0 left-0 w-2 h-screen bg-[hsl(var(--memphis-yellow,45_95%_55%))] opacity-60" style={{ width: '6px' }} />
+      {/* Top-right accent dot cluster */}
+      <div className="mcm-blob top-6 right-6 w-16 h-16 rounded-full border-4 border-[hsl(var(--accent))] opacity-30" />
+      <div className="mcm-blob top-12 right-16 w-6 h-6 rounded-full bg-[hsl(var(--primary))] opacity-20" />
+      {/* Bottom-left triangle */}
+      <div className="mcm-blob bottom-16 left-8 w-0 h-0 border-l-[20px] border-l-transparent border-r-[20px] border-r-transparent border-b-[36px] border-b-[hsl(var(--accent))] opacity-20" />
+      {/* Mid-right rectangle */}
+      <div className="mcm-blob top-[40%] -right-2 w-8 h-24 bg-[hsl(var(--primary))] opacity-15 rounded-l-lg" />
 
       {/* Header */}
-      <header className="border-b border-border bg-card/95 backdrop-blur-sm sticky top-0 z-50 mcm-shadow-sm">
-        <div className="container max-w-7xl mx-auto px-4 py-4">
+      <header className="border-b-2 border-border bg-white/95 backdrop-blur-sm sticky top-0 z-50" style={{ boxShadow: '0 2px 0 hsl(var(--border)), 0 4px 20px -8px hsl(230 25% 12% / 0.10)' }}>
+        <div className="container max-w-7xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
+
+            {/* Logo — Memphis bold wordmark */}
             <div className="flex items-center gap-3">
-              <motion.img
-                src={mcmLogo}
-                alt="SpendSmart logo"
-                width={56}
-                height={56}
-                className="w-14 h-14 rounded-full bg-card border border-border mcm-shadow-sm object-contain p-1"
-                animate={{ rotate: [0, -4, 4, -4, 0] }}
-                transition={{ duration: 1.2, repeat: Infinity, repeatDelay: 6 }}
-              />
+              {/* Geometric logo mark — concentric square + dot */}
+              <div className="relative w-10 h-10 shrink-0">
+                <div className="absolute inset-0 rounded-md bg-[hsl(var(--primary))]" />
+                <div className="absolute inset-1.5 rounded-sm bg-white" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-2.5 h-2.5 rounded-full bg-[hsl(var(--primary))]" />
+                </div>
+              </div>
               <div>
-                <h1 className="font-display font-normal text-4xl tracking-wide leading-none">SPENDSMART</h1>
-                <p className="text-base text-muted-foreground font-serif-mcm italic">Stay on top of what you spend on</p>
+                <h1 className="font-display text-3xl leading-none tracking-tight" style={{ fontWeight: 900, letterSpacing: '-0.02em' }}>
+                  SpendSmart
+                </h1>
+                <p className="text-xs text-muted-foreground font-body mt-0.5 tracking-wide">Stay on top of what you spend on</p>
               </div>
             </div>
 
             <div className="flex items-center gap-2">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="p-2 rounded-md border border-border bg-card hover:bg-secondary transition-colors mcm-shadow-sm">
-                    <Settings className="w-5 h-5 text-muted-foreground" />
+                  <button className="p-2 rounded-lg border-2 border-border bg-white hover:bg-secondary transition-colors mcm-shadow-sm">
+                    <Settings className="w-4 h-4 text-muted-foreground" />
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
@@ -99,37 +104,49 @@ const Index = () => {
                   }}>
                     <RefreshCw className="w-4 h-4 mr-2" /> Re-sync From Cloud
                   </DropdownMenuItem>
+                  <PdfImport
+                    trigger={
+                      <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                        <FileText className="w-4 h-4 mr-2" /> Import Bank Statement (PDF)
+                      </DropdownMenuItem>
+                    }
+                  />
                 </DropdownMenuContent>
               </DropdownMenu>
 
-            {/* Tab Switcher */}
-            <div className="flex rounded-full bg-secondary p-1 gap-1 border border-border mcm-shadow-sm">
-              <button
-                onClick={() => setTab('weekly')}
-                className={`flex items-center gap-1.5 px-5 py-2 rounded-full text-base font-medium tracking-wide transition-all ${
-                  tab === 'weekly'
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                <Wallet className="w-4 h-4" />
-                Weekly
-              </button>
-              <button
-                onClick={() => setTab('timeseries')}
-                className={`flex items-center gap-1.5 px-5 py-2 rounded-full text-base font-medium tracking-wide transition-all ${
-                  tab === 'timeseries'
-                    ? 'bg-accent text-accent-foreground'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                <BarChart3 className="w-4 h-4" />
-                Time Series
-              </button>
-            </div>
+              {/* Tab Switcher — Memphis pill with bold text */}
+              <div className="flex rounded-lg bg-secondary p-1 gap-1 border-2 border-border mcm-shadow-sm">
+                <button
+                  onClick={() => setTab('weekly')}
+                  className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-semibold tracking-wide transition-all ${
+                    tab === 'weekly'
+                      ? 'bg-[hsl(var(--primary))] text-white shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <Wallet className="w-3.5 h-3.5" />
+                  Weekly
+                </button>
+                <button
+                  onClick={() => setTab('timeseries')}
+                  className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-semibold tracking-wide transition-all ${
+                    tab === 'timeseries'
+                      ? 'bg-[hsl(var(--accent))] text-white shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <BarChart3 className="w-3.5 h-3.5" />
+                  Time Series
+                </button>
+              </div>
             </div>
           </div>
         </div>
+
+        {/* Memphis bold underline stripe below header */}
+        <div className="h-1 w-full" style={{
+          background: 'linear-gradient(90deg, hsl(var(--primary)) 0%, hsl(var(--accent)) 50%, hsl(var(--mcm-mustard)) 100%)'
+        }} />
       </header>
 
       {/* Content */}

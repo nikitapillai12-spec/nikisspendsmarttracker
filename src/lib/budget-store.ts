@@ -57,7 +57,8 @@ export async function initStore(): Promise<BudgetData> {
         date: r.entry_date,
         createdAt: new Date(r.created_at).getTime(),
         note: (r as any).note ?? undefined,
-        type: ((r as any).type ?? 'spend') as 'spend' | 'credit',
+        type: ((r as any).type ?? 'spend') as 'spend' | 'credit' | 'investment',
+        refundPairId: (r as any).refund_pair_id ?? undefined,
       })),
       monthlyBudgets: (mbRes.data || []).map(r => ({
         month: r.month,
@@ -148,7 +149,8 @@ async function refetchAll() {
         date: r.entry_date,
         createdAt: new Date(r.created_at).getTime(),
         note: (r as any).note ?? undefined,
-        type: ((r as any).type ?? 'spend') as 'spend' | 'credit',
+        type: ((r as any).type ?? 'spend') as 'spend' | 'credit' | 'investment',
+        refundPairId: (r as any).refund_pair_id ?? undefined,
       })),
       monthlyBudgets: (mbRes.data || []).map(r => ({ month: r.month, amount: Number(r.amount) })),
       categoryBudgets: (cbRes.data || []).map(r => ({
@@ -233,7 +235,46 @@ export function addEntry(entry: SpendEntry): BudgetData {
     category: entry.category,
     note: entry.note ?? null,
     type: entry.type ?? 'spend',
+    refund_pair_id: (entry as any).refundPairId ?? null,
   }).then(({ error }) => { if (error) console.error('addEntry sync', error); });
+  return cache;
+}
+
+/** Link two entries as a spend/refund pair by setting refundPairId on both. */
+export function linkRefundPair(spendId: string, creditId: string): BudgetData {
+  cache.entries = cache.entries.map(e => {
+    if (e.id === spendId) return { ...e, refundPairId: creditId };
+    if (e.id === creditId) return { ...e, refundPairId: spendId };
+    return e;
+  });
+  notify();
+  const vid = vaultId();
+  supabase.from('spend_entries').update({ refund_pair_id: creditId } as any).eq('id', spendId).eq('vault_id', vid)
+    .then(({ error }) => { if (error) console.error('linkRefundPair spend sync', error); });
+  supabase.from('spend_entries').update({ refund_pair_id: spendId } as any).eq('id', creditId).eq('vault_id', vid)
+    .then(({ error }) => { if (error) console.error('linkRefundPair credit sync', error); });
+  return cache;
+}
+
+/** Unlink a refund pair. */
+export function unlinkRefundPair(entryId: string): BudgetData {
+  const entry = cache.entries.find(e => e.id === entryId);
+  const pairedId = entry?.refundPairId;
+  cache.entries = cache.entries.map(e => {
+    if (e.id === entryId || e.id === pairedId) {
+      const { refundPairId: _, ...rest } = e as any;
+      return rest;
+    }
+    return e;
+  });
+  notify();
+  const vid = vaultId();
+  supabase.from('spend_entries').update({ refund_pair_id: null } as any).eq('id', entryId).eq('vault_id', vid)
+    .then(({ error }) => { if (error) console.error('unlinkRefundPair sync', error); });
+  if (pairedId) {
+    supabase.from('spend_entries').update({ refund_pair_id: null } as any).eq('id', pairedId).eq('vault_id', vid)
+      .then(({ error }) => { if (error) console.error('unlinkRefundPair paired sync', error); });
+  }
   return cache;
 }
 

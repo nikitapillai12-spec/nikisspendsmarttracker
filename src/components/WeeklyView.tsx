@@ -5,8 +5,8 @@ import { DayBox } from './DayBox';
 import { CategoryManager } from './CategoryManager';
 import { RecurringPaymentsManager } from './RecurringPaymentsManager';
 import { InvestmentsManager } from './InvestmentsManager';
-import { BudgetData, Category, SpendEntry, EntryType, RecurringPayment, getAllCategories, getCategoryEmoji, getCategoryColor, getRecurringForMonth, signedAmount } from '@/lib/budget-types';
-import { getWeekStart, getWeekEnd, getWeekDays, formatDate, formatMonth, formatDisplayMonth, navigateWeek, getWeeklyBudget, weeksTouchingMonth, recurringDisplayDateInWeek } from '@/lib/date-utils';
+import { BudgetData, Category, SpendEntry, EntryType, RecurringPayment, getAllCategories, getCategoryEmoji, getCategoryColor, getRecurringForMonth, signedAmount, shouldDistributeWeekly } from '@/lib/budget-types';
+import { getWeekStart, getWeekEnd, getWeekDays, formatDate, formatMonth, formatDisplayMonth, navigateWeek, getWeeklyBudget, weeksTouchingMonth, recurringDisplayDateInWeek, getWeekRepresentativeDatesForMonth } from '@/lib/date-utils';
 import { addEntry, updateEntry, deleteEntry, getMonthlyBudget, setMonthlyBudget, setCategoryBudget, deleteCategoryBudget, getEffectiveCategoryBudget } from '@/lib/budget-store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,12 +31,8 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
   const weeklyBudget = currentBudget ? getWeeklyBudget(currentBudget) : null;
   const allCats = useMemo(() => getAllCategories(data.customCategories), [data.customCategories]);
 
-  // Recurring monthly payments → split per week of the month they apply to.
-  // Computed for the week's primary month, then picked into the right day cell.
   const recurringSplits = useMemo(() => {
     const result: Array<{ payment: RecurringPayment; perWeek: number; displayDate: string | null }> = [];
-    // A week may span two months. Compute splits for both months, keep only
-    // those whose displayDate falls inside this exact week.
     const monthsForWeek = new Set<string>();
     days.forEach(d => monthsForWeek.add(formatMonth(d)));
     monthsForWeek.forEach(mk => {
@@ -51,7 +47,6 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
     return result;
   }, [data.recurringPayments, days, weekStart]);
 
-  // Group recurring splits by date string for quick lookup per day cell
   const recurringByDate = useMemo(() => {
     const m: Record<string, Array<{ payment: RecurringPayment; perWeek: number }>> = {};
     recurringSplits.forEach(({ payment, perWeek, displayDate }) => {
@@ -69,10 +64,39 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
     return data.entries.filter(e => e.date >= start && e.date <= end);
   }, [data.entries, weekStart, weekEnd]);
 
+  // Weekly summary stats (Item 3)
+  const weekTotalSpend = weekEntries.filter(e => (e.type ?? 'spend') === 'spend').reduce((s, e) => s + e.amount, 0);
+  const weekTotalCredits = weekEntries.filter(e => e.type === 'credit').reduce((s, e) => s + e.amount, 0);
+  const weekTotalInvestments = weekEntries.filter(e => e.type === 'investment').reduce((s, e) => s + e.amount, 0);
+  const weekNetSpend = weekTotalSpend - weekTotalCredits;
   const weekTotal = weekEntries.reduce((s, e) => s + signedAmount(e), 0);
   const budgetDiff = weeklyBudget ? weeklyBudget - weekTotal : null;
 
   const handleAdd = useCallback((dateStr: string, amount: number, category: Category, note?: string, type?: EntryType) => {
+    const effectiveType = type ?? 'spend';
+
+    // Items 6/7/8: Auto-distribute across weeks for Salary, Rent, Utilities, Subscriptions
+    if (shouldDistributeWeekly(category, effectiveType)) {
+      const month = dateStr.slice(0, 7); // YYYY-MM
+      const weekDates = getWeekRepresentativeDatesForMonth(month);
+      const perWeek = amount / weekDates.length;
+      let latest: BudgetData = { ...data };
+      weekDates.forEach((wDate, i) => {
+        const e: SpendEntry = {
+          id: crypto.randomUUID(),
+          amount: Math.round(perWeek * 100) / 100,
+          category,
+          date: wDate,
+          createdAt: Date.now() + i,
+          note: note ? `${note} (wk ${i + 1}/${weekDates.length})` : `Week ${i + 1}/${weekDates.length}`,
+          type: effectiveType,
+        };
+        latest = addEntry(e);
+      });
+      onDataChange(latest);
+      return;
+    }
+
     const entry: SpendEntry = {
       id: crypto.randomUUID(),
       amount,
@@ -80,10 +104,10 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
       date: dateStr,
       createdAt: Date.now(),
       note,
-      type: type ?? 'spend',
+      type: effectiveType,
     };
     onDataChange(addEntry(entry));
-  }, [onDataChange]);
+  }, [onDataChange, data]);
 
   const handleUpdate = useCallback((id: string, amount: number, category: Category, note?: string, type?: EntryType) => {
     onDataChange(updateEntry(id, { amount, category, note, type }));
@@ -114,12 +138,10 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
       if (!Number.isNaN(val) && val > 0) {
         latest = setMonthlyBudget(month, val);
       }
-      // Clear any per-category budgets set at this exact month so totals drive
       (latest.categoryBudgets || [])
         .filter(b => b.month === month)
         .forEach(b => { latest = deleteCategoryBudget(b.category, month); });
     } else {
-      // Categories mode: save each category budget, auto-compute total
       let sum = 0;
       Object.entries(catBudgetInputs).forEach(([cat, raw]) => {
         const trimmed = raw.trim();
@@ -216,7 +238,7 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
               <DialogHeader>
                 <DialogTitle className="font-display">Budgets for {formatDisplayMonth(weekStart)}</DialogTitle>
               </DialogHeader>
-              <p className="text-xs text-muted-foreground -mt-1">Changes apply from this month forward. Earlier months keep their existing budgets.</p>
+              <p className="text-xs text-muted-foreground -mt-1">Changes apply from this month forward.</p>
               <div className="space-y-5 pt-3">
                 <div className="grid grid-cols-2 gap-2 p-1 rounded-full bg-secondary">
                   <button
@@ -251,9 +273,6 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
                         ≈ £{getWeeklyBudget(parseFloat(budgetInput)).toFixed(2)} per week
                       </p>
                     )}
-                    <p className="text-xs text-muted-foreground mt-3">
-                      Set a single total for the month. Per-category budgets for this month will be cleared.
-                    </p>
                   </div>
                 ) : (
                   <div>
@@ -261,9 +280,6 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
                       <label className="text-sm font-medium flex items-center gap-1.5"><Tag className="w-4 h-4" /> Per-category budgets</label>
                       <span className="text-xs font-semibold">Total: £{totalCategoryBudgets.toFixed(2)}</span>
                     </div>
-                    <p className="text-xs text-muted-foreground mb-2">
-                      Fill only the ones that matter. Your overall monthly budget will be the sum (≈ £{getWeeklyBudget(totalCategoryBudgets).toFixed(2)}/wk).
-                    </p>
                     <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
                       {allCats.map(cat => (
                         <div key={cat} className="flex items-center gap-2">
@@ -298,6 +314,28 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
           <RecurringPaymentsManager data={data} onDataChange={onDataChange} />
           <InvestmentsManager data={data} onDataChange={onDataChange} />
           <CategoryManager data={data} onDataChange={onDataChange} />
+        </div>
+      </div>
+
+      {/* Weekly Summary Stats (Item 3) */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="rounded-xl border border-border bg-budget-over/10 px-4 py-3 text-center">
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Total Spend</div>
+          <div className="font-display text-xl text-budget-over">£{weekTotalSpend.toFixed(2)}</div>
+        </div>
+        <div className="rounded-xl border border-border bg-budget-under/10 px-4 py-3 text-center">
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Total Credits</div>
+          <div className="font-display text-xl text-budget-under">£{weekTotalCredits.toFixed(2)}</div>
+        </div>
+        <div className={`rounded-xl border border-border px-4 py-3 text-center ${weekNetSpend >= 0 ? 'bg-secondary' : 'bg-budget-under/10'}`}>
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Net Spend</div>
+          <div className={`font-display text-xl ${weekNetSpend < 0 ? 'text-budget-under' : 'text-foreground'}`}>
+            {weekNetSpend < 0 ? '-' : ''}£{Math.abs(weekNetSpend).toFixed(2)}
+          </div>
+        </div>
+        <div className="rounded-xl border border-border bg-blue-50 px-4 py-3 text-center">
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Investments</div>
+          <div className="font-display text-xl text-blue-600">£{weekTotalInvestments.toFixed(2)}</div>
         </div>
       </div>
 
@@ -340,6 +378,7 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
                 onAdd={(amount, category, note, type) => handleAdd(dateStr, amount, category, note, type)}
                 onUpdate={handleUpdate}
                 onDelete={handleDelete}
+                onDataChange={onDataChange}
               />
             </motion.div>
           );

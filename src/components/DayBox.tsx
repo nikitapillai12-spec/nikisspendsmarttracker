@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Pencil, Trash2, Check, X } from 'lucide-react';
+import { Plus, Pencil, Trash2, Check, X, TrendingUp, Link, Link2Off } from 'lucide-react';
 import { SpendEntry, Category, CustomCategory, EntryType, RecurringPayment, getAllCategories, getCategoryColor, getCategoryEmoji, signedAmount } from '@/lib/budget-types';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { formatDisplayDate, isToday } from '@/lib/date-utils';
@@ -8,35 +8,41 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RetailerInput } from './RetailerInput';
+import { linkRefundPair, unlinkRefundPair } from '@/lib/budget-store';
 
 interface DayBoxProps {
   date: Date;
   dateStr: string;
   entries: SpendEntry[];
   customCategories: CustomCategory[];
-  /** All entries across history — used to power retailer autocomplete suggestions. */
   allEntries: SpendEntry[];
-  /** Monthly recurring payment splits that "land" on this day. Display-only;
-   *  not counted in the day's ad-hoc total. */
   recurringSplits?: { payment: RecurringPayment; perWeek: number }[];
   onAdd: (amount: number, category: Category, note?: string, type?: EntryType) => void;
   onUpdate: (id: string, amount: number, category: Category, note?: string, type?: EntryType) => void;
   onDelete: (id: string) => void;
+  onDataChange: (data: any) => void;
 }
 
-export function DayBox({ date, dateStr, entries, customCategories, allEntries, recurringSplits, onAdd, onUpdate, onDelete }: DayBoxProps) {
-  const [isAdding, setIsAdding] = useState(false);
+type AddMode = null | 'spend' | 'credit' | 'investment';
+
+interface RefundSuggestion {
+  spendEntry: SpendEntry;
+  creditEntry: SpendEntry;
+}
+
+export function DayBox({ date, dateStr, entries, customCategories, allEntries, recurringSplits, onAdd, onUpdate, onDelete, onDataChange }: DayBoxProps) {
+  const [addMode, setAddMode] = useState<AddMode>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [amount, setAmount] = useState('');
   const [entryType, setEntryType] = useState<EntryType>('spend');
   const [category, setCategory] = useState<Category>('Groceries');
   const [note, setNote] = useState('');
+  const [refundSuggestion, setRefundSuggestion] = useState<RefundSuggestion | null>(null);
 
   const total = entries.reduce((s, e) => s + signedAmount(e), 0);
   const today = isToday(date);
   const allCategories = getAllCategories(customCategories, entryType);
 
-  // Keep selected category valid when toggling between spend/credit
   const switchType = (t: EntryType) => {
     setEntryType(t);
     const list = getAllCategories(customCategories, t);
@@ -45,7 +51,6 @@ export function DayBox({ date, dateStr, entries, customCategories, allEntries, r
     }
   };
 
-  // Pie chart only shows SPEND entries (credits aren't a spend chunk)
   const spendEntries = entries.filter(e => (e.type ?? 'spend') === 'spend');
   const pieData = Object.entries(
     spendEntries.reduce<Record<string, number>>((acc, e) => {
@@ -54,7 +59,6 @@ export function DayBox({ date, dateStr, entries, customCategories, allEntries, r
     }, {})
   ).map(([name, value]) => ({ name, value }));
 
-  // Retailers per category for this day (for pie hover)
   const retailersByCat: Record<string, { note: string; total: number }[]> = {};
   for (const cat of pieData.map(p => p.name)) {
     const totals = new Map<string, number>();
@@ -89,16 +93,55 @@ export function DayBox({ date, dateStr, entries, customCategories, allEntries, r
     );
   };
 
+  /** After adding a credit, check if a matching spend exists for refund suggestion */
+  const checkRefundMatch = (newEntry: SpendEntry) => {
+    if (newEntry.type !== 'credit') return;
+    // Look for unlinked spend entries with same or similar merchant note
+    const candidates = allEntries.filter(e =>
+      (e.type ?? 'spend') === 'spend' &&
+      !e.refundPairId &&
+      e.id !== newEntry.id &&
+      (
+        (e.note && newEntry.note && e.note.toLowerCase().includes(newEntry.note.toLowerCase().split(' ')[0])) ||
+        e.category === newEntry.category.replace(' Refund', '').replace('Shopping', 'Groceries') ||
+        Math.abs(e.amount - newEntry.amount) < 0.01
+      )
+    );
+    if (candidates.length > 0) {
+      // Pick closest match by amount
+      const best = candidates.sort((a, b) => Math.abs(a.amount - newEntry.amount) - Math.abs(b.amount - newEntry.amount))[0];
+      setRefundSuggestion({ spendEntry: best, creditEntry: newEntry });
+    }
+  };
+
   const handleAdd = () => {
     const val = parseFloat(amount);
-    if (val > 0) {
-      onAdd(val, category, note.trim() || undefined, entryType);
-      setAmount('');
-      setEntryType('spend');
-      setCategory('Groceries');
-      setNote('');
-      setIsAdding(false);
-    }
+    if (val <= 0 || !amount) return;
+
+    const cat = entryType === 'investment' ? 'Investment' : category;
+    const actualType: EntryType = entryType;
+
+    // WeeklyView.handleAdd intercepts distributed categories (Salary, Rent, Utilities, Subscriptions)
+    // and splits them across weeks. DayBox just calls onAdd with the full amount.
+    onAdd(val, cat, note.trim() || undefined, actualType);
+
+    // Check refund match after a short delay to let entry propagate
+    const newEntry: SpendEntry = {
+      id: 'temp',
+      amount: val,
+      category: cat,
+      date: dateStr,
+      createdAt: Date.now(),
+      note: note.trim() || undefined,
+      type: actualType,
+    };
+    if (actualType === 'credit') setTimeout(() => checkRefundMatch({ ...newEntry, id: 'new' }), 100);
+
+    setAmount('');
+    setEntryType('spend');
+    setCategory('Groceries');
+    setNote('');
+    setAddMode(null);
   };
 
   const handleUpdate = (id: string) => {
@@ -114,10 +157,39 @@ export function DayBox({ date, dateStr, entries, customCategories, allEntries, r
   const startEdit = (entry: SpendEntry) => {
     setEditingId(entry.id);
     setAmount(entry.amount.toString());
-    setEntryType(entry.type ?? 'spend');
+    setEntryType((entry.type ?? 'spend') as EntryType);
     setCategory(entry.category);
     setNote(entry.note || '');
-    setIsAdding(false);
+    setAddMode(null);
+  };
+
+  const openAdd = (mode: 'spend' | 'credit' | 'investment') => {
+    setAddMode(mode);
+    setEditingId(null);
+    setEntryType(mode === 'investment' ? 'investment' : mode);
+    const cats = getAllCategories(customCategories, mode === 'investment' ? 'investment' : mode);
+    setCategory(cats[0] ?? 'Groceries');
+    setAmount('');
+    setNote('');
+  };
+
+  const confirmRefundLink = () => {
+    if (!refundSuggestion) return;
+    onDataChange(linkRefundPair(refundSuggestion.spendEntry.id, refundSuggestion.creditEntry.id));
+    setRefundSuggestion(null);
+  };
+
+  const isLinked = (entry: SpendEntry) => !!entry.refundPairId;
+  const getPair = (entry: SpendEntry) => entry.refundPairId ? allEntries.find(e => e.id === entry.refundPairId) : null;
+
+  const getNetLabel = (entry: SpendEntry): string | null => {
+    const pair = getPair(entry);
+    if (!pair) return null;
+    const spend = (entry.type ?? 'spend') === 'spend' ? entry : pair;
+    const credit = (entry.type ?? 'spend') === 'credit' ? entry : pair;
+    const net = spend.amount - credit.amount;
+    if (net <= 0.01) return 'Full refund — net: £0';
+    return `Partially refunded — net: £${net.toFixed(2)}`;
   };
 
   return (
@@ -125,11 +197,7 @@ export function DayBox({ date, dateStr, entries, customCategories, allEntries, r
       layout
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`rounded-xl border border-border p-4 transition-all bg-card mcm-shadow hover:-translate-y-0.5 ${
-        today
-          ? 'bg-primary/10'
-          : ''
-      }`}
+      className={`rounded-xl border border-border p-4 transition-all bg-card mcm-shadow hover:-translate-y-0.5 ${today ? 'bg-primary/10' : ''}`}
     >
       <div className="flex items-center justify-between mb-3">
         <div>
@@ -141,43 +209,44 @@ export function DayBox({ date, dateStr, entries, customCategories, allEntries, r
           )}
         </div>
         {total > 0 && (
-          <motion.span
-            key={total}
-            initial={{ scale: 0.8 }}
-            animate={{ scale: 1 }}
-            className="font-display font-normal text-2xl text-primary tracking-wide"
-          >
+          <motion.span key={total} initial={{ scale: 0.8 }} animate={{ scale: 1 }} className="font-display font-normal text-2xl text-primary tracking-wide">
             £{total.toFixed(2)}
           </motion.span>
         )}
         {total < 0 && (
-          <motion.span
-            key={total}
-            initial={{ scale: 0.8 }}
-            animate={{ scale: 1 }}
-            className="font-display font-normal text-2xl tracking-wide text-budget-under"
-          >
+          <motion.span key={total} initial={{ scale: 0.8 }} animate={{ scale: 1 }} className="font-display font-normal text-2xl tracking-wide text-budget-under">
             -£{Math.abs(total).toFixed(2)}
           </motion.span>
         )}
       </div>
+
+      {/* Refund suggestion popup */}
+      <AnimatePresence>
+        {refundSuggestion && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            className="mb-3 rounded-lg border-2 border-primary bg-primary/10 p-3 text-xs"
+          >
+            <p className="font-semibold mb-1">🔗 Possible refund match found</p>
+            <p className="text-muted-foreground mb-2">
+              We think <strong>{refundSuggestion.spendEntry.note || refundSuggestion.spendEntry.category} £{refundSuggestion.spendEntry.amount.toFixed(2)} ({refundSuggestion.spendEntry.date})</strong> and <strong>{refundSuggestion.creditEntry.note || refundSuggestion.creditEntry.category} £{refundSuggestion.creditEntry.amount.toFixed(2)}</strong> are a matching spend and refund. Shall we net these off?
+            </p>
+            <div className="flex gap-2">
+              <Button size="sm" className="h-7 text-xs" onClick={confirmRefundLink}>✓ Confirm</Button>
+              <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setRefundSuggestion(null)}>✗ Cancel</Button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Pie Chart */}
       {pieData.length > 0 && (
         <div className="h-44 mb-3">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
-              <Pie
-                data={pieData}
-                dataKey="value"
-                nameKey="name"
-                cx="50%"
-                cy="50%"
-                outerRadius="92%"
-                innerRadius="55%"
-                strokeWidth={1.5}
-                stroke="hsl(var(--card))"
-              >
+              <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius="92%" innerRadius="55%" strokeWidth={1.5} stroke="hsl(var(--card))">
                 {pieData.map((entry) => (
                   <Cell key={entry.name} fill={getCategoryColor(entry.name, customCategories)} />
                 ))}
@@ -191,69 +260,69 @@ export function DayBox({ date, dateStr, entries, customCategories, allEntries, r
       {/* Entries List */}
       <div className="space-y-2 mb-3 max-h-40 overflow-y-auto">
         <AnimatePresence>
-          {entries.map((entry) => (
-            <motion.div key={entry.id} layout initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} className="flex items-center gap-1.5 text-sm group">
-              {editingId === entry.id ? (
-                <div className="flex flex-col gap-1.5 w-full">
-                  <div className="grid grid-cols-2 gap-1 p-0.5 rounded-full bg-secondary text-xs">
-                    <button
-                      type="button"
-                      onClick={() => switchType('spend')}
-                      className={`rounded-full py-1 font-semibold transition-colors ${entryType === 'spend' ? 'bg-budget-over/20 text-budget-over' : 'text-muted-foreground'}`}
-                    >− Spend</button>
-                    <button
-                      type="button"
-                      onClick={() => switchType('credit')}
-                      className={`rounded-full py-1 font-semibold transition-colors ${entryType === 'credit' ? 'bg-budget-under/20 text-budget-under' : 'text-muted-foreground'}`}
-                    >+ Credit</button>
+          {entries.map((entry) => {
+            const linked = isLinked(entry);
+            const netLabel = getNetLabel(entry);
+            return (
+              <motion.div key={entry.id} layout initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} className="flex flex-col gap-0.5 text-sm group">
+                {editingId === entry.id ? (
+                  <div className="flex flex-col gap-1.5 w-full">
+                    <div className="grid grid-cols-2 gap-1 p-0.5 rounded-full bg-secondary text-xs">
+                      <button type="button" onClick={() => switchType('spend')} className={`rounded-full py-1 font-semibold transition-colors ${entryType === 'spend' ? 'bg-budget-over/20 text-budget-over' : 'text-muted-foreground'}`}>− Spend</button>
+                      <button type="button" onClick={() => switchType('credit')} className={`rounded-full py-1 font-semibold transition-colors ${entryType === 'credit' ? 'bg-budget-under/20 text-budget-under' : 'text-muted-foreground'}`}>+ Credit</button>
+                    </div>
+                    <div className="flex gap-1.5">
+                      <Input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} className="h-8 text-sm flex-1" placeholder="£" />
+                      <Select value={category} onValueChange={(v) => setCategory(v)}>
+                        <SelectTrigger className="h-8 text-sm flex-1"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {getAllCategories(customCategories, entryType).map((c) => (
+                            <SelectItem key={c} value={c} className="text-sm">{getCategoryEmoji(c, customCategories)} {c}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <RetailerInput value={note} onChange={setNote} entries={allEntries} category={category} className="h-8 text-sm" />
+                    <div className="flex gap-1">
+                      <Button size="sm" className="h-7 text-sm px-2" onClick={() => handleUpdate(entry.id)}><Check className="w-3.5 h-3.5" /></Button>
+                      <Button size="sm" variant="ghost" className="h-7 text-sm px-2" onClick={() => setEditingId(null)}><X className="w-3.5 h-3.5" /></Button>
+                    </div>
                   </div>
-                  <div className="flex gap-1.5">
-                    <Input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} className="h-8 text-sm flex-1" placeholder="£" />
-                    <Select value={category} onValueChange={(v) => setCategory(v)}>
-                      <SelectTrigger className="h-8 text-sm flex-1"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {allCategories.map((c) => (
-                          <SelectItem key={c} value={c} className="text-sm">{getCategoryEmoji(c, customCategories)} {c}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <RetailerInput
-                    value={note}
-                    onChange={setNote}
-                    entries={allEntries}
-                    category={category}
-                    className="h-8 text-sm"
-                  />
-                  <div className="flex gap-1">
-                    <Button size="sm" className="h-7 text-sm px-2" onClick={() => handleUpdate(entry.id)}><Check className="w-3.5 h-3.5" /></Button>
-                    <Button size="sm" variant="ghost" className="h-7 text-sm px-2" onClick={() => setEditingId(null)}><X className="w-3.5 h-3.5" /></Button>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <span className="shrink-0">{getCategoryEmoji(entry.category, customCategories)}</span>
-                  <div className="truncate flex-1 min-w-0 text-muted-foreground text-sm" title={entry.note ? `${entry.category} (${entry.note})` : entry.category}>
-                    {entry.category}
-                    {entry.note && (
-                      <span className="text-foreground/80 font-medium"> ({entry.note})</span>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-1.5">
+                      <span className="shrink-0">{getCategoryEmoji(entry.category, customCategories)}</span>
+                      <div className="truncate flex-1 min-w-0 text-muted-foreground text-sm" title={entry.note ? `${entry.category} (${entry.note})` : entry.category}>
+                        {entry.category}
+                        {entry.note && <span className="text-foreground/80 font-medium"> ({entry.note})</span>}
+                        {linked && <span className="ml-1 text-[10px] text-primary font-semibold">🔗</span>}
+                      </div>
+                      {(entry.type ?? 'spend') === 'credit' ? (
+                        <span className="font-semibold text-budget-under">+£{entry.amount.toFixed(2)}</span>
+                      ) : (entry.type === 'investment') ? (
+                        <span className="font-semibold text-blue-600">📊£{entry.amount.toFixed(2)}</span>
+                      ) : (
+                        <span className="font-semibold text-budget-over">-£{entry.amount.toFixed(2)}</span>
+                      )}
+                      <button onClick={() => startEdit(entry)} className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"><Pencil className="w-3.5 h-3.5" /></button>
+                      {linked ? (
+                        <button onClick={() => onDataChange(unlinkRefundPair(entry.id))} className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive" title="Unlink refund pair"><Link2Off className="w-3.5 h-3.5" /></button>
+                      ) : (
+                        <button onClick={() => onDelete(entry.id)} className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"><Trash2 className="w-3.5 h-3.5" /></button>
+                      )}
+                    </div>
+                    {linked && netLabel && (
+                      <div className="ml-6 text-[11px] text-primary/80 italic">{netLabel}</div>
                     )}
-                  </div>
-                  {(entry.type ?? 'spend') === 'credit' ? (
-                    <span className="font-semibold text-budget-under">+£{entry.amount.toFixed(2)}</span>
-                  ) : (
-                    <span className="font-semibold text-budget-over">-£{entry.amount.toFixed(2)}</span>
-                  )}
-                  <button onClick={() => startEdit(entry)} className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"><Pencil className="w-3.5 h-3.5" /></button>
-                  <button onClick={() => onDelete(entry.id)} className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"><Trash2 className="w-3.5 h-3.5" /></button>
-                </>
-              )}
-            </motion.div>
-          ))}
+                  </>
+                )}
+              </motion.div>
+            );
+          })}
         </AnimatePresence>
       </div>
 
-      {/* Monthly recurring payment splits — read-only, separate from totals */}
+      {/* Monthly recurring payment splits — read-only */}
       {recurringSplits && recurringSplits.length > 0 && (
         <div className="mb-3 rounded-lg border border-dashed border-border bg-secondary/40 p-2 space-y-1">
           <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Recurring (week share)</div>
@@ -269,57 +338,80 @@ export function DayBox({ date, dateStr, entries, customCategories, allEntries, r
 
       {/* Add Form */}
       <AnimatePresence>
-        {isAdding && (
+        {addMode && (
           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden mb-2">
             <div className="flex flex-col gap-2 pt-2 border-t border-border">
-              <div className="grid grid-cols-2 gap-1 p-0.5 rounded-full bg-secondary text-xs">
-                <button
-                  type="button"
-                  onClick={() => switchType('spend')}
-                  className={`rounded-full py-1.5 font-semibold transition-colors ${entryType === 'spend' ? 'bg-budget-over/20 text-budget-over' : 'text-muted-foreground'}`}
-                >− Add a Spend</button>
-                <button
-                  type="button"
-                  onClick={() => switchType('credit')}
-                  className={`rounded-full py-1.5 font-semibold transition-colors ${entryType === 'credit' ? 'bg-budget-under/20 text-budget-under' : 'text-muted-foreground'}`}
-                >+ Add a Credit</button>
+              <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                {addMode === 'spend' ? '− Add Spend' : addMode === 'credit' ? '+ Add Credit' : '📊 Add Investment'}
               </div>
-              <Input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} className="h-9 text-base" placeholder="£ amount" autoFocus onKeyDown={(e) => e.key === 'Enter' && handleAdd()} />
-              <Select value={category} onValueChange={(v) => setCategory(v)}>
-                <SelectTrigger className="h-9 text-base"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {allCategories.map((c) => (
-                    <SelectItem key={c} value={c} className="text-base">{getCategoryEmoji(c, customCategories)} {c}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Input
+                type="number"
+                step="0.01"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className="h-9 text-base"
+                placeholder="£ amount"
+                autoFocus
+                onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+              />
+              {addMode !== 'investment' && (
+                <Select value={category} onValueChange={(v) => setCategory(v)}>
+                  <SelectTrigger className="h-9 text-base"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {allCategories.map((c) => (
+                      <SelectItem key={c} value={c} className="text-base">{getCategoryEmoji(c, customCategories)} {c}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              {addMode === 'investment' && (
+                <div className="text-xs text-muted-foreground px-1">Investment spend — tracked separately from budget</div>
+              )}
               <RetailerInput
                 value={note}
                 onChange={setNote}
                 entries={allEntries}
-                category={category}
+                category={addMode === 'investment' ? 'Investment' : category}
                 className="h-9 text-base"
                 onEnter={handleAdd}
               />
               <div className="flex gap-2">
                 <Button size="sm" className="flex-1 h-9 text-sm" onClick={handleAdd}>Add</Button>
-                <Button size="sm" variant="ghost" className="h-9 text-sm" onClick={() => { setIsAdding(false); setAmount(''); setNote(''); }}>Cancel</Button>
+                <Button size="sm" variant="ghost" className="h-9 text-sm" onClick={() => { setAddMode(null); setAmount(''); setNote(''); }}>Cancel</Button>
               </div>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {!isAdding && editingId === null && (
-        <Button
-          variant="outline"
-          size="sm"
-          className="w-full h-9 text-sm border border-dashed border-border hover:border-primary hover:text-primary hover:bg-primary/10 transition-all"
-          onClick={() => setIsAdding(true)}
-        >
-          <Plus className="w-4 h-4 mr-1" />
-          Add Spend
-        </Button>
+      {/* Three distinct add buttons */}
+      {!addMode && editingId === null && (
+        <div className="flex flex-col gap-1.5">
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full h-8 text-xs border border-dashed border-budget-over/50 hover:border-budget-over hover:text-budget-over hover:bg-budget-over/10 transition-all"
+            onClick={() => openAdd('spend')}
+          >
+            <Plus className="w-3.5 h-3.5 mr-1" /> Add Spend
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full h-8 text-xs border border-dashed border-budget-under/50 hover:border-budget-under hover:text-budget-under hover:bg-budget-under/10 transition-all"
+            onClick={() => openAdd('credit')}
+          >
+            <Plus className="w-3.5 h-3.5 mr-1" /> Add Credits
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full h-8 text-xs border border-dashed border-blue-400/50 hover:border-blue-500 hover:text-blue-600 hover:bg-blue-50 transition-all"
+            onClick={() => openAdd('investment')}
+          >
+            <TrendingUp className="w-3.5 h-3.5 mr-1" /> Add Investment
+          </Button>
+        </div>
       )}
     </motion.div>
   );
