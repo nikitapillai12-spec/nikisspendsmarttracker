@@ -212,7 +212,27 @@ export function PdfImport({ trigger }: { trigger: React.ReactNode }) {
   const [rows, setRows] = useState<ParsedRow[]>([]);
   const [bank, setBank] = useState<Bank>('Unknown');
   const [saving, setSaving] = useState(false);
+  const [mode, setMode] = useState<'upload' | 'paste'>('upload');
+  const [pasteText, setPasteText] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
+
+  function processText(text: string) {
+    const detectedBank = detectBank(text);
+    setBank(detectedBank);
+    const existing = getAll().entries;
+    const parsed = parseTransactions(text, detectedBank);
+    if (parsed.length === 0) {
+      toast.error('No transactions found. Check the format — dates and amounts must be present on each line.');
+      return;
+    }
+    const withIds: ParsedRow[] = parsed.map(r => ({
+      ...r,
+      id: crypto.randomUUID(),
+      approved: !isDuplicate(r, existing),
+      duplicate: isDuplicate(r, existing),
+    }));
+    setRows(withIds);
+  }
 
   const handleFile = async (file: File) => {
     setLoading(true);
@@ -225,7 +245,9 @@ export function PdfImport({ trigger }: { trigger: React.ReactNode }) {
       const parsed = parseTransactions(text, detectedBank);
 
       if (parsed.length === 0) {
-        toast.error('No transactions found. The PDF may be encrypted or image-based. Try copy-pasting text manually.');
+        // PDF extraction failed — switch to paste mode automatically
+        setMode('paste');
+        toast('PDF text could not be read. Please copy-paste the statement text below instead.', { duration: 6000 });
         setLoading(false);
         return;
       }
@@ -238,10 +260,17 @@ export function PdfImport({ trigger }: { trigger: React.ReactNode }) {
       }));
       setRows(withIds);
     } catch (e) {
-      toast.error('Could not parse PDF. The file may be encrypted or image-based.');
+      setMode('paste');
+      toast('Could not read PDF. Please paste the statement text below instead.', { duration: 6000 });
       console.error(e);
     }
     setLoading(false);
+  };
+
+  const handleParse = () => {
+    if (!pasteText.trim()) { toast.error('Please paste your statement text first.'); return; }
+    setRows([]);
+    processText(pasteText);
   };
 
   const toggleApprove = (id: string) => {
@@ -291,26 +320,73 @@ export function PdfImport({ trigger }: { trigger: React.ReactNode }) {
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Upload area */}
-          <div
-            className="border-2 border-dashed border-border rounded-xl p-8 text-center cursor-pointer hover:border-primary transition-colors"
-            onClick={() => fileRef.current?.click()}
-          >
-            <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-            <p className="text-sm font-semibold">Click to upload bank statement PDF</p>
-            <p className="text-xs text-muted-foreground mt-1">AMEX · Natwest · Lloyds · Barclays</p>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="application/pdf,.pdf"
-              className="hidden"
-              onChange={e => {
-                const f = e.target.files?.[0];
-                if (f) handleFile(f);
-                e.target.value = '';
-              }}
-            />
+          {/* Mode tabs */}
+          <div className="flex rounded-lg border border-border overflow-hidden text-sm font-semibold">
+            <button
+              onClick={() => setMode('upload')}
+              className={`flex-1 py-2 flex items-center justify-center gap-2 transition-colors ${mode === 'upload' ? 'bg-primary text-white' : 'bg-background text-muted-foreground hover:text-foreground'}`}
+            >
+              <Upload className="w-3.5 h-3.5" /> Upload PDF
+            </button>
+            <button
+              onClick={() => setMode('paste')}
+              className={`flex-1 py-2 flex items-center justify-center gap-2 transition-colors ${mode === 'paste' ? 'bg-primary text-white' : 'bg-background text-muted-foreground hover:text-foreground'}`}
+            >
+              <FileText className="w-3.5 h-3.5" /> Paste Text
+            </button>
           </div>
+
+          {/* Upload area */}
+          {mode === 'upload' && (
+            <>
+              <div
+                className="border-2 border-dashed border-border rounded-xl p-8 text-center cursor-pointer hover:border-primary transition-colors"
+                onClick={() => fileRef.current?.click()}
+              >
+                <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                <p className="text-sm font-semibold">Click to upload bank statement PDF</p>
+                <p className="text-xs text-muted-foreground mt-1">AMEX · Natwest · Lloyds · Barclays</p>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="application/pdf,.pdf"
+                  className="hidden"
+                  onChange={e => {
+                    const f = e.target.files?.[0];
+                    if (f) handleFile(f);
+                    e.target.value = '';
+                  }}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground text-center">
+                If your PDF is encrypted or image-based, use <button className="underline text-primary" onClick={() => setMode('paste')}>Paste Text</button> instead.
+              </p>
+            </>
+          )}
+
+          {/* Paste text area */}
+          {mode === 'paste' && (
+            <div className="space-y-3">
+              <div className="rounded-xl border border-border bg-secondary/40 p-3 text-xs text-muted-foreground space-y-1">
+                <p className="font-semibold text-foreground">How to copy from AMEX / your bank:</p>
+                <ol className="list-decimal list-inside space-y-0.5">
+                  <li>Open your PDF statement in a browser or PDF viewer</li>
+                  <li>Press <kbd className="bg-muted px-1 rounded text-[10px]">Cmd+A</kbd> (Mac) or <kbd className="bg-muted px-1 rounded text-[10px]">Ctrl+A</kbd> (Windows) to select all</li>
+                  <li>Press <kbd className="bg-muted px-1 rounded text-[10px]">Cmd+C</kbd> / <kbd className="bg-muted px-1 rounded text-[10px]">Ctrl+C</kbd> to copy</li>
+                  <li>Paste it in the box below</li>
+                </ol>
+              </div>
+              <textarea
+                value={pasteText}
+                onChange={e => setPasteText(e.target.value)}
+                placeholder="Paste your bank statement text here…"
+                className="w-full h-40 rounded-xl border border-border p-3 text-xs font-mono resize-none focus:outline-none focus:border-primary bg-background"
+              />
+              <Button className="w-full" onClick={handleParse} disabled={!pasteText.trim()}>
+                Parse Transactions
+              </Button>
+            </div>
+          )}
 
           {loading && (
             <div className="flex items-center justify-center gap-2 py-6 text-muted-foreground">
