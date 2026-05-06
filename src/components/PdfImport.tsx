@@ -78,8 +78,8 @@ function classifyTransaction(description: string, amount: number): { type: Entry
   if (desc.includes('insurance') || desc.includes('aviva') || desc.includes('axa') || desc.includes('admiral') || desc.includes('direct line')) {
     return { type: 'spend', category: 'Insurance', note };
   }
-  if (desc.includes('amazon') || desc.includes('ebay') || desc.includes('asos') || desc.includes('zara') || desc.includes('h&m') || desc.includes('next') || desc.includes('primark') || desc.includes('john lewis') || desc.includes('argos') || desc.includes('currys')) {
-    return { type: 'spend', category: 'Gifts', note };
+  if (desc.includes('amazon') || desc.includes('ebay') || desc.includes('asos') || desc.includes('zara') || desc.includes('h&m') || desc.includes('next') || desc.includes('primark') || desc.includes('john lewis') || desc.includes('argos') || desc.includes('currys') || desc.includes('amznmktplace') || desc.includes('amzn')) {
+    return { type: 'spend', category: 'Shopping', note };
   }
   if (desc.includes('b&q') || desc.includes('ikea') || desc.includes('wickes') || desc.includes('homebase') || desc.includes('screwfix')) {
     return { type: 'spend', category: 'Home Improvement', note };
