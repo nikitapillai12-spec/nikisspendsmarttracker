@@ -232,6 +232,7 @@ export type Database = {
           entry_date: string
           id: string
           note: string | null
+          refund_pair_id: string | null
           type: string
           vault_id: string
         }
@@ -242,6 +243,7 @@ export type Database = {
           entry_date: string
           id?: string
           note?: string | null
+          refund_pair_id?: string | null
           type?: string
           vault_id: string
         }
@@ -252,6 +254,7 @@ export type Database = {
           entry_date?: string
           id?: string
           note?: string | null
+          refund_pair_id?: string | null
           type?: string
           vault_id?: string
         }
