@@ -130,69 +130,169 @@ async function extractTextFromPdf(file: File): Promise<string> {
   });
 }
 
-/** Parse transaction lines from extracted PDF text */
+const MONTHS: Record<string, string> = {
+  jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
+  jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12',
+};
+
+// Parse "Jan 12" or "Feb 1" style dates — AMEX omits the year so we infer it
+// from the statement header line (e.g. "15/02/26") or fall back to current year.
+function parseAmexDate(d: string, refYear: number, refMonth: number): string | null {
+  const m = d.match(/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2})$/i);
+  if (!m) return null;
+  const mo = MONTHS[m[1].toLowerCase()];
+  const day = m[2].padStart(2, '0');
+  // If month is later than ref month, it likely belongs to previous year
+  const moNum = parseInt(mo);
+  const year = moNum > refMonth ? refYear - 1 : refYear;
+  return `${year}-${mo}-${day}`;
+}
+
+function parseGenericDate(s: string): string | null {
+  // DD/MM/YYYY or DD/MM/YY
+  let m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (m) {
+    const y = m[3].length === 2 ? '20' + m[3] : m[3];
+    return `${y}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+  }
+  // YYYY-MM-DD
+  m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (m) return s;
+  // DD MMM YYYY
+  m = s.match(/^(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{4})$/i);
+  if (m) {
+    const mo = MONTHS[m[2].toLowerCase()];
+    return `${m[3]}-${mo}-${m[1].padStart(2,'0')}`;
+  }
+  return null;
+}
+
+/** Parse transaction lines from extracted PDF/paste text */
 function parseTransactions(text: string, bank: Bank): Omit<ParsedRow, 'id' | 'approved' | 'duplicate'>[] {
   const rows: Omit<ParsedRow, 'id' | 'approved' | 'duplicate'>[] = [];
 
-  // Date patterns: DD/MM/YYYY, DD MMM YYYY, YYYY-MM-DD
-  const datePatterns = [
-    /(\d{2}\/\d{2}\/\d{4})/g,
-    /(\d{2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4})/gi,
-    /(\d{4}-\d{2}-\d{2})/g,
-  ];
+  // Detect statement year/month from AMEX header line e.g. "15/02/26"
+  let refYear = new Date().getFullYear();
+  let refMonth = new Date().getMonth() + 1;
+  const headerDate = text.match(/\b(\d{2})\/(\d{2})\/(\d{2})\b/);
+  if (headerDate) {
+    refYear = 2000 + parseInt(headerDate[3]);
+    refMonth = parseInt(headerDate[2]);
+  }
 
-  // Amount patterns: £1,234.56 or 1,234.56 or -1,234.56
+  if (bank === 'AMEX') {
+    return parseAmex(text, refYear, refMonth);
+  }
+
+  // Generic parser for Natwest / Lloyds / Barclays
   const amountPattern = /[-−]?£?[\d,]+\.\d{2}/g;
-
-  const lines = text.split(/\n|\r/).filter(l => l.trim().length > 5);
+  const lines = text.split(/[\n\r]+/).filter(l => l.trim().length > 5);
 
   for (const line of lines) {
-    let dateStr = '';
-    let amount = 0;
+    const datePat = /(\d{1,2}\/\d{1,2}\/\d{2,4}|\d{4}-\d{2}-\d{2}|\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4})/i;
+    const dm = line.match(datePat);
+    if (!dm) continue;
+    const parsedDate = parseGenericDate(dm[1]);
+    if (!parsedDate || parsedDate < '2015-01-01') continue;
 
-    // Try each date pattern
-    for (const pat of datePatterns) {
-      pat.lastIndex = 0;
-      const m = pat.exec(line);
-      if (m) { dateStr = m[1]; break; }
-    }
-    if (!dateStr) continue;
-
-    // Parse date to YYYY-MM-DD
-    let parsedDate = '';
-    try {
-      if (dateStr.includes('/')) {
-        const [d, mo, y] = dateStr.split('/');
-        parsedDate = `${y}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`;
-      } else if (dateStr.match(/\d{4}-\d{2}-\d{2}/)) {
-        parsedDate = dateStr;
-      } else {
-        const dt = new Date(dateStr);
-        if (!isNaN(dt.getTime())) parsedDate = dt.toISOString().slice(0, 10);
-      }
-    } catch { continue; }
-    if (!parsedDate || parsedDate < '2020-01-01') continue;
-
-    // Extract amount(s)
     const amounts = line.match(amountPattern);
-    if (!amounts || amounts.length === 0) continue;
+    if (!amounts) continue;
     const rawAmt = amounts[amounts.length - 1].replace(/[£,\s]/g, '').replace('−', '-');
-    amount = Math.abs(parseFloat(rawAmt));
+    const amount = Math.abs(parseFloat(rawAmt));
     if (isNaN(amount) || amount <= 0) continue;
 
-    // Description: text between date and amount
     const description = line
-      .replace(/\d{2}\/\d{2}\/\d{4}|\d{2}\s+\w{3}\s+\d{4}|\d{4}-\d{2}-\d{2}/g, '')
-      .replace(amountPattern, '')
-      .replace(/[£,]/g, '')
-      .trim()
-      .replace(/\s+/g, ' ');
-
+      .replace(datePat, '').replace(amountPattern, '').replace(/[£,]/g, '')
+      .trim().replace(/\s+/g, ' ');
     if (description.length < 2) continue;
 
-    const { type, category, note } = classifyTransaction(description + ' ' + rawAmt, parseFloat(rawAmt));
-
+    const isCredit = rawAmt.startsWith('-') || line.toLowerCase().includes('cr ') || line.toLowerCase().endsWith(' cr');
+    const { type, category, note } = classifyTransaction(description, isCredit ? -amount : amount);
     rows.push({ date: parsedDate, description, amount, suggestedType: type, suggestedCategory: category, suggestedNote: note });
+  }
+  return rows;
+}
+
+/**
+ * AMEX-specific parser.
+ * Format (from PDF copy-paste):
+ *   "Jan 12 Jan 15 AMZNMKTPLACE*B68TB40N5 AMAZON.CO.UK\n79.56"
+ * OR all on one line when copy-pasted differently:
+ *   "Jan 12 Jan 15 AMZNMKTPLACE*B68TB40N5 AMAZON.CO.UK 79.56"
+ * Amount may appear on the NEXT line as a bare number.
+ * "CR" suffix or on same line means credit/refund.
+ */
+function parseAmex(text: string, refYear: number, refMonth: number): Omit<ParsedRow, 'id' | 'approved' | 'duplicate'>[] {
+  const rows: Omit<ParsedRow, 'id' | 'approved' | 'duplicate'>[] = [];
+
+  // Normalise: collapse multiple spaces, keep newlines
+  const lines = text.split(/[\n\r]+/).map(l => l.trim()).filter(l => l.length > 0);
+
+  // AMEX transaction line starts with: "Mon DD Mon DD description"
+  // e.g. "Jan 12 Jan 15 AMZNMKTPLACE..."
+  const txLineRe = /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2})\s+(.*)/i;
+  // Standalone amount line: just a number like "79.56" or "79.56" with optional CR
+  const amountLineRe = /^([\d,]+\.\d{2})\s*(CR)?$/i;
+  // Amount at end of description: "...LONDON 79.56" or "...LONDON 79.56 CR"
+  const amountInlineRe = /\s+([\d,]+\.\d{2})\s*(CR)?\s*$/i;
+
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    const tm = line.match(txLineRe);
+    if (!tm) { i++; continue; }
+
+    // tm[1]+tm[2] = transaction date, tm[3]+tm[4] = process date, tm[5] = rest
+    const txDateStr = `${tm[1]} ${tm[2]}`;
+    const parsedDate = parseAmexDate(txDateStr, refYear, refMonth);
+    if (!parsedDate) { i++; continue; }
+
+    let description = tm[5].trim();
+    let amount = 0;
+    let isCredit = false;
+
+    // Check if amount is inline at end of description
+    const inlineM = description.match(amountInlineRe);
+    if (inlineM) {
+      amount = parseFloat(inlineM[1].replace(/,/g, ''));
+      isCredit = !!inlineM[2];
+      description = description.replace(amountInlineRe, '').trim();
+    } else {
+      // Look at next line for the amount
+      const nextLine = lines[i + 1] || '';
+      const nextM = nextLine.match(amountLineRe);
+      if (nextM) {
+        amount = parseFloat(nextM[1].replace(/,/g, ''));
+        isCredit = !!nextM[2];
+        i++; // consume amount line
+      } else {
+        // Sometimes amount is 2 lines down (e.g. when there's a sub-description line)
+        const nextNextLine = lines[i + 2] || '';
+        const nextNextM = nextNextLine.match(amountLineRe);
+        if (nextNextM) {
+          amount = parseFloat(nextNextM[1].replace(/,/g, ''));
+          isCredit = !!nextNextM[2];
+          // append sub-description line to description
+          description = (description + ' ' + nextLine).trim().replace(/\s+/g, ' ');
+          i += 2;
+        }
+      }
+    }
+
+    if (amount <= 0 || isNaN(amount)) { i++; continue; }
+
+    // Clean description: strip location suffixes like "LONDON", "AMSTERDAM" at end
+    const cleanDesc = description
+      .replace(/\s+(LONDON|AMSTERDAM|SURREY|HACKNEY|UK|UNITED KINGDOM)\s*$/i, '')
+      .trim();
+
+    const { type, category, note } = classifyTransaction(cleanDesc, isCredit ? -amount : amount);
+    // CR on AMEX = payment/refund credit
+    const finalType = isCredit ? 'credit' : type;
+    const finalCat = isCredit ? 'Shopping Refund' : category;
+
+    rows.push({ date: parsedDate, description: cleanDesc, amount, suggestedType: finalType, suggestedCategory: finalCat, suggestedNote: note });
+    i++;
   }
 
   return rows;
