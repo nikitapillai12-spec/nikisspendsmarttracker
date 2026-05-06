@@ -1,9 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { createPortal } from 'react-dom';
 import { Link, Check, X, ChevronDown, ChevronUp, Bell } from 'lucide-react';
 import { SpendEntry, BudgetData } from '@/lib/budget-types';
 import { linkRefundPair } from '@/lib/budget-store';
-import { Button } from '@/components/ui/button';
 
 interface RefundPair {
   id: string;
@@ -135,7 +134,6 @@ export function RefundMatcher({ data, onDataChange }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [scanned, setScanned] = useState(false);
 
-  // Scan entries once data is loaded
   useEffect(() => {
     if (data.entries.length === 0) return;
     if (scanned) return;
@@ -149,17 +147,17 @@ export function RefundMatcher({ data, onDataChange }: Props) {
     setScanned(true);
   }, [data.entries.length, scanned]);
 
-  const toggle = useCallback((id: string, action: 'confirm' | 'reject') => {
-    if (action === 'confirm') {
-      setConfirmed(prev => { const s = new Set(prev); s.add(id); return s; });
-      setRejected(prev => { const s = new Set(prev); s.delete(id); return s; });
-    } else {
-      setRejected(prev => { const s = new Set(prev); s.add(id); return s; });
-      setConfirmed(prev => { const s = new Set(prev); s.delete(id); return s; });
-    }
+  const handleConfirm = useCallback((id: string) => {
+    setConfirmed(prev => { const s = new Set(prev); s.add(id); return s; });
+    setRejected(prev => { const s = new Set(prev); s.delete(id); return s; });
   }, []);
 
-  const toggleExpand = useCallback((id: string) => {
+  const handleReject = useCallback((id: string) => {
+    setRejected(prev => { const s = new Set(prev); s.add(id); return s; });
+    setConfirmed(prev => { const s = new Set(prev); s.delete(id); return s; });
+  }, []);
+
+  const handleToggleExpand = useCallback((id: string) => {
     setExpanded(prev => {
       const s = new Set(prev);
       if (s.has(id)) s.delete(id); else s.add(id);
@@ -174,7 +172,6 @@ export function RefundMatcher({ data, onDataChange }: Props) {
         latest = linkRefundPair(pair.spend.id, pair.credit.id);
       }
     }
-    // Remove confirmed and rejected pairs from the list; keep pending ones
     setPairs(prev => prev.filter(p => !confirmed.has(p.id) && !rejected.has(p.id)));
     setConfirmed(new Set());
     setRejected(new Set());
@@ -182,243 +179,295 @@ export function RefundMatcher({ data, onDataChange }: Props) {
     setOpen(false);
   }, [data, pairs, confirmed, rejected, onDataChange]);
 
+  const handleSkip = useCallback(() => {
+    setOpen(false);
+  }, []);
+
+  const handleOpen = useCallback(() => {
+    setOpen(true);
+  }, []);
+
   const confirmedCount = confirmed.size;
-  const pendingCount = pairs.length - confirmed.size - rejected.size;
-  // Unreviewed pairs = not yet confirmed or rejected
   const unreviewedCount = pairs.filter(p => !confirmed.has(p.id) && !rejected.has(p.id)).length;
+
+  const bell = !open && pairs.length > 0 ? (
+    <div
+      style={{
+        position: 'fixed',
+        bottom: '24px',
+        right: '24px',
+        zIndex: 99999,
+      }}
+    >
+      <button
+        onClick={handleOpen}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          padding: '12px 18px',
+          borderRadius: '999px',
+          border: 'none',
+          background: 'hsl(350, 80%, 52%)',
+          color: 'white',
+          fontSize: '14px',
+          fontWeight: 700,
+          cursor: 'pointer',
+          boxShadow: '0 8px 24px -4px rgba(0,0,0,0.35)',
+          position: 'relative',
+        }}
+      >
+        <Bell style={{ width: '16px', height: '16px' }} />
+        {unreviewedCount > 0 ? `${unreviewedCount} refund match${unreviewedCount !== 1 ? 'es' : ''} to review` : 'Review refund matches'}
+        {unreviewedCount > 0 && (
+          <span style={{
+            position: 'absolute',
+            top: '-6px',
+            right: '-6px',
+            width: '20px',
+            height: '20px',
+            borderRadius: '50%',
+            background: 'white',
+            color: 'hsl(350, 80%, 52%)',
+            fontSize: '11px',
+            fontWeight: 900,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+            {unreviewedCount}
+          </span>
+        )}
+      </button>
+    </div>
+  ) : null;
+
+  const modal = open ? (
+    <div
+      onClick={handleSkip}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 99999,
+        background: 'rgba(0,0,0,0.65)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '16px',
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: 'white',
+          borderRadius: '16px',
+          border: '2px solid #e2e8f0',
+          width: '100%',
+          maxWidth: '680px',
+          maxHeight: '90vh',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          boxShadow: '0 24px 60px -12px rgba(0,0,0,0.4)',
+        }}
+      >
+        {/* Header */}
+        <div style={{ padding: '20px', borderBottom: '1px solid #e2e8f0', borderTop: '4px solid hsl(350, 80%, 52%)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'hsl(350, 80%, 52%, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Link style={{ width: '16px', height: '16px', color: 'hsl(350, 80%, 52%)' }} />
+            </div>
+            <h2 style={{ fontFamily: 'Rubik, sans-serif', fontWeight: 700, fontSize: '18px', margin: 0 }}>
+              Possible Refund Matches Found
+            </h2>
+          </div>
+          <p style={{ fontSize: '13px', color: '#64748b', margin: 0 }}>
+            We scanned your {data.entries.length} transactions and found <strong>{pairs.length} possible spend/refund pair{pairs.length !== 1 ? 's' : ''}</strong>. Confirm to net them off, or reject to keep separate. <strong>Nothing changes until you click Apply.</strong>
+          </p>
+          {unreviewedCount > 0 && (
+            <p style={{ fontSize: '12px', color: 'hsl(38, 90%, 42%)', fontWeight: 600, marginTop: '6px', marginBottom: 0 }}>
+              ⚠ {unreviewedCount} pair{unreviewedCount !== 1 ? 's' : ''} still need your decision
+            </p>
+          )}
+        </div>
+
+        {/* Pairs list */}
+        <div style={{ overflowY: 'auto', flex: 1 }}>
+          {pairs.map((pair) => {
+            const isConfirmed = confirmed.has(pair.id);
+            const isRejected = rejected.has(pair.id);
+            const isExp = expanded.has(pair.id);
+
+            return (
+              <div
+                key={pair.id}
+                style={{
+                  padding: '16px',
+                  borderBottom: '1px solid #e2e8f0',
+                  background: isConfirmed ? 'hsl(145, 55%, 38%, 0.06)' : isRejected ? '#f8fafc' : 'white',
+                }}
+              >
+                {/* Top row */}
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: '10px' }}>
+                  <span style={{
+                    flexShrink: 0,
+                    fontSize: '10px',
+                    fontWeight: 700,
+                    textTransform: 'uppercase' as const,
+                    letterSpacing: '0.08em',
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    marginTop: '2px',
+                    background: pair.confidence === 'high' ? 'rgba(46,160,67,0.15)' : 'rgba(210,140,0,0.15)',
+                    color: pair.confidence === 'high' ? 'hsl(145, 55%, 32%)' : 'hsl(38, 90%, 35%)',
+                  }}>
+                    {pair.confidence}
+                  </span>
+
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '14px', fontWeight: 600, display: 'flex', flexWrap: 'wrap' as const, gap: '6px', alignItems: 'center' }}>
+                      <span style={{ color: 'hsl(5, 75%, 48%)' }}>
+                        -{pair.spend.note || pair.spend.category} £{pair.spend.amount.toFixed(2)}
+                      </span>
+                      <span style={{ color: '#94a3b8', fontSize: '12px' }}>({pair.spend.date})</span>
+                      <span style={{ color: '#94a3b8' }}>↔</span>
+                      <span style={{ color: 'hsl(145, 55%, 38%)' }}>
+                        +{pair.credit.note || pair.credit.category} £{pair.credit.amount.toFixed(2)}
+                      </span>
+                      <span style={{ color: '#94a3b8', fontSize: '12px' }}>({pair.credit.date})</span>
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px', display: 'flex', gap: '10px', flexWrap: 'wrap' as const }}>
+                      <span>Match: {pair.reason}</span>
+                      <span style={{ fontWeight: 700, color: pair.isFullRefund ? 'hsl(145, 55%, 38%)' : 'hsl(350, 80%, 52%)' }}>
+                        {pair.isFullRefund ? '✓ Full refund — net: £0' : `Partial refund — net: £${pair.netAmount.toFixed(2)}`}
+                      </span>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => handleToggleExpand(pair.id)}
+                    style={{ flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: '4px' }}
+                  >
+                    {isExp ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  </button>
+                </div>
+
+                {/* Expanded detail */}
+                {isExp && (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
+                    <div style={{ borderRadius: '8px', border: '1px solid rgba(220,50,50,0.25)', background: 'rgba(220,50,50,0.04)', padding: '10px', fontSize: '12px' }}>
+                      <div style={{ fontWeight: 700, color: 'hsl(5, 75%, 48%)', marginBottom: '6px' }}>SPEND</div>
+                      <div><span style={{ color: '#64748b' }}>Date: </span>{pair.spend.date}</div>
+                      <div><span style={{ color: '#64748b' }}>Amount: </span>£{pair.spend.amount.toFixed(2)}</div>
+                      <div><span style={{ color: '#64748b' }}>Category: </span>{pair.spend.category}</div>
+                      {pair.spend.note && <div><span style={{ color: '#64748b' }}>Merchant: </span>{pair.spend.note}</div>}
+                    </div>
+                    <div style={{ borderRadius: '8px', border: '1px solid rgba(46,160,67,0.25)', background: 'rgba(46,160,67,0.04)', padding: '10px', fontSize: '12px' }}>
+                      <div style={{ fontWeight: 700, color: 'hsl(145, 55%, 38%)', marginBottom: '6px' }}>CREDIT / REFUND</div>
+                      <div><span style={{ color: '#64748b' }}>Date: </span>{pair.credit.date}</div>
+                      <div><span style={{ color: '#64748b' }}>Amount: </span>£{pair.credit.amount.toFixed(2)}</div>
+                      <div><span style={{ color: '#64748b' }}>Category: </span>{pair.credit.category}</div>
+                      {pair.credit.note && <div><span style={{ color: '#64748b' }}>Merchant: </span>{pair.credit.note}</div>}
+                    </div>
+                  </div>
+                )}
+
+                {/* Action buttons */}
+                <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                  <button
+                    onClick={() => handleConfirm(pair.id)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '8px 14px',
+                      borderRadius: '8px',
+                      border: '2px solid hsl(145, 55%, 38%)',
+                      background: isConfirmed ? 'hsl(145, 55%, 38%)' : 'white',
+                      color: isConfirmed ? 'white' : 'hsl(145, 55%, 38%)',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <Check size={14} />
+                    {isConfirmed ? 'Confirmed ✓' : 'Yes — net these off'}
+                  </button>
+                  <button
+                    onClick={() => handleReject(pair.id)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '8px 14px',
+                      borderRadius: '8px',
+                      border: '2px solid #cbd5e1',
+                      background: isRejected ? '#e2e8f0' : 'white',
+                      color: isRejected ? '#475569' : '#94a3b8',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <X size={14} />
+                    {isRejected ? 'Kept separate' : 'No — keep separate'}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: '16px', borderTop: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' as const, gap: '12px' }}>
+          <div style={{ fontSize: '13px', color: '#64748b' }}>
+            <span style={{ fontWeight: 700, color: 'hsl(145, 55%, 38%)' }}>{confirmedCount} confirmed</span>
+            {' · '}
+            <span style={{ fontWeight: 700, color: '#94a3b8' }}>{rejected.size} rejected</span>
+            {unreviewedCount > 0 && <span style={{ color: 'hsl(38, 90%, 42%)', fontWeight: 600 }}> · {unreviewedCount} pending</span>}
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              onClick={handleSkip}
+              style={{
+                padding: '8px 16px',
+                borderRadius: '8px',
+                border: '2px solid #e2e8f0',
+                background: 'white',
+                color: '#64748b',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              Skip for now
+            </button>
+            <button
+              onClick={handleApplyAll}
+              disabled={confirmedCount === 0}
+              style={{
+                padding: '8px 18px',
+                borderRadius: '8px',
+                border: 'none',
+                background: confirmedCount === 0 ? '#e2e8f0' : 'hsl(350, 80%, 52%)',
+                color: confirmedCount === 0 ? '#94a3b8' : 'white',
+                fontSize: '13px',
+                fontWeight: 700,
+                cursor: confirmedCount === 0 ? 'not-allowed' : 'pointer',
+              }}
+            >
+              Apply {confirmedCount} confirmed match{confirmedCount !== 1 ? 'es' : ''}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  ) : null;
 
   return (
     <>
-      {/* Persistent notification bell — always visible when there are pending pairs */}
-      <AnimatePresence>
-        {!open && pairs.length > 0 && (
-          <motion.button
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0, opacity: 0 }}
-            onClick={() => setOpen(true)}
-            className="fixed bottom-6 right-6 z-40 flex items-center gap-2 px-4 py-3 rounded-full bg-primary text-white font-semibold text-sm shadow-lg hover:bg-primary/90 transition-colors"
-            style={{ boxShadow: '0 8px 24px -4px hsl(350 80% 52% / 0.5)' }}
-          >
-            <Bell className="w-4 h-4" />
-            {unreviewedCount > 0 ? (
-              <span>{unreviewedCount} refund match{unreviewedCount !== 1 ? 'es' : ''} to review</span>
-            ) : (
-              <span>Review refund matches</span>
-            )}
-            {unreviewedCount > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-white text-primary text-[11px] font-black flex items-center justify-center">
-                {unreviewedCount}
-              </span>
-            )}
-          </motion.button>
-        )}
-      </AnimatePresence>
-
-      {/* Full-screen confirmation dialog */}
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}
-            onClick={(e) => { if (e.target === e.currentTarget) setOpen(false); }}
-          >
-            <motion.div
-              initial={{ scale: 0.92, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.92, opacity: 0 }}
-              style={{ background: 'white', borderRadius: '16px', border: '2px solid #e2e8f0', width: '100%', maxWidth: '680px', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 60px -12px rgba(0,0,0,0.4)' }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Header */}
-              <div style={{ padding: '20px', borderBottom: '1px solid #e2e8f0', borderTop: '4px solid hsl(350, 80%, 52%)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                  <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'hsl(350 80% 52% / 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Link style={{ width: '16px', height: '16px', color: 'hsl(350, 80%, 52%)' }} />
-                  </div>
-                  <h2 style={{ fontFamily: 'Rubik, sans-serif', fontWeight: 700, fontSize: '18px', margin: 0 }}>
-                    Possible Refund Matches Found
-                  </h2>
-                </div>
-                <p style={{ fontSize: '13px', color: '#64748b', margin: 0 }}>
-                  We scanned your {data.entries.length} transactions and found <strong>{pairs.length} possible spend/refund pair{pairs.length !== 1 ? 's' : ''}</strong>. Confirm to net them off, or reject to keep separate. <strong>Nothing changes until you click "Apply".</strong>
-                </p>
-                {unreviewedCount > 0 && (
-                  <p style={{ fontSize: '12px', color: 'hsl(38, 90%, 42%)', fontWeight: 600, marginTop: '6px', marginBottom: 0 }}>
-                    ⚠ {unreviewedCount} pair{unreviewedCount !== 1 ? 's' : ''} still need your decision
-                  </p>
-                )}
-              </div>
-
-              {/* Pairs list */}
-              <div style={{ overflowY: 'auto', flex: 1 }}>
-                {pairs.map((pair) => {
-                  const isConfirmed = confirmed.has(pair.id);
-                  const isRejected = rejected.has(pair.id);
-                  const isExp = expanded.has(pair.id);
-
-                  return (
-                    <div
-                      key={pair.id}
-                      style={{
-                        padding: '16px',
-                        borderBottom: '1px solid #e2e8f0',
-                        background: isConfirmed ? 'hsl(145 55% 38% / 0.06)' : isRejected ? '#f8fafc' : 'white',
-                      }}
-                    >
-                      {/* Top row */}
-                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: '10px' }}>
-                        {/* Confidence badge */}
-                        <span style={{
-                          flexShrink: 0,
-                          fontSize: '10px',
-                          fontWeight: 700,
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.08em',
-                          padding: '2px 8px',
-                          borderRadius: '4px',
-                          marginTop: '2px',
-                          background: pair.confidence === 'high' ? 'hsl(145 55% 38% / 0.15)' : 'hsl(38 90% 52% / 0.15)',
-                          color: pair.confidence === 'high' ? 'hsl(145, 55%, 32%)' : 'hsl(38, 90%, 35%)',
-                        }}>
-                          {pair.confidence}
-                        </span>
-
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: '14px', fontWeight: 600, display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
-                            <span style={{ color: 'hsl(5, 75%, 48%)' }}>
-                              -{pair.spend.note || pair.spend.category} £{pair.spend.amount.toFixed(2)}
-                            </span>
-                            <span style={{ color: '#94a3b8', fontSize: '12px' }}>({pair.spend.date})</span>
-                            <span style={{ color: '#94a3b8' }}>↔</span>
-                            <span style={{ color: 'hsl(145, 55%, 38%)' }}>
-                              +{pair.credit.note || pair.credit.category} £{pair.credit.amount.toFixed(2)}
-                            </span>
-                            <span style={{ color: '#94a3b8', fontSize: '12px' }}>({pair.credit.date})</span>
-                          </div>
-                          <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                            <span>Match: {pair.reason}</span>
-                            <span style={{ fontWeight: 700, color: pair.isFullRefund ? 'hsl(145, 55%, 38%)' : 'hsl(350, 80%, 52%)' }}>
-                              {pair.isFullRefund ? '✓ Full refund — net: £0' : `Partial refund — net: £${pair.netAmount.toFixed(2)}`}
-                            </span>
-                          </div>
-                        </div>
-
-                        <button
-                          onClick={() => toggleExpand(pair.id)}
-                          style={{ flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: '4px' }}
-                        >
-                          {isExp ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                        </button>
-                      </div>
-
-                      {/* Expanded detail */}
-                      {isExp && (
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
-                          <div style={{ borderRadius: '8px', border: '1px solid hsl(5 75% 48% / 0.25)', background: 'hsl(5 75% 48% / 0.04)', padding: '10px', fontSize: '12px' }}>
-                            <div style={{ fontWeight: 700, color: 'hsl(5, 75%, 48%)', marginBottom: '6px' }}>SPEND</div>
-                            <div><span style={{ color: '#64748b' }}>Date: </span>{pair.spend.date}</div>
-                            <div><span style={{ color: '#64748b' }}>Amount: </span>£{pair.spend.amount.toFixed(2)}</div>
-                            <div><span style={{ color: '#64748b' }}>Category: </span>{pair.spend.category}</div>
-                            {pair.spend.note && <div><span style={{ color: '#64748b' }}>Merchant: </span>{pair.spend.note}</div>}
-                          </div>
-                          <div style={{ borderRadius: '8px', border: '1px solid hsl(145 55% 38% / 0.25)', background: 'hsl(145 55% 38% / 0.04)', padding: '10px', fontSize: '12px' }}>
-                            <div style={{ fontWeight: 700, color: 'hsl(145, 55%, 38%)', marginBottom: '6px' }}>CREDIT / REFUND</div>
-                            <div><span style={{ color: '#64748b' }}>Date: </span>{pair.credit.date}</div>
-                            <div><span style={{ color: '#64748b' }}>Amount: </span>£{pair.credit.amount.toFixed(2)}</div>
-                            <div><span style={{ color: '#64748b' }}>Category: </span>{pair.credit.category}</div>
-                            {pair.credit.note && <div><span style={{ color: '#64748b' }}>Merchant: </span>{pair.credit.note}</div>}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Confirm / Reject buttons — plain HTML buttons, no Tailwind, guaranteed clickable */}
-                      <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
-                        <button
-                          onClick={() => toggle(pair.id, 'confirm')}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            padding: '8px 14px',
-                            borderRadius: '8px',
-                            border: `2px solid hsl(145, 55%, 38%)`,
-                            background: isConfirmed ? 'hsl(145, 55%, 38%)' : 'transparent',
-                            color: isConfirmed ? 'white' : 'hsl(145, 55%, 38%)',
-                            fontSize: '13px',
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            transition: 'all 0.15s',
-                          }}
-                        >
-                          <Check size={14} />
-                          {isConfirmed ? 'Confirmed ✓' : 'Yes — net these off'}
-                        </button>
-                        <button
-                          onClick={() => toggle(pair.id, 'reject')}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            padding: '8px 14px',
-                            borderRadius: '8px',
-                            border: `2px solid #e2e8f0`,
-                            background: isRejected ? '#e2e8f0' : 'transparent',
-                            color: isRejected ? '#475569' : '#94a3b8',
-                            fontSize: '13px',
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            transition: 'all 0.15s',
-                          }}
-                        >
-                          <X size={14} />
-                          {isRejected ? 'Kept separate' : 'No — keep separate'}
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Footer */}
-              <div style={{ padding: '16px', borderTop: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-                <div style={{ fontSize: '13px', color: '#64748b' }}>
-                  <span style={{ fontWeight: 700, color: 'hsl(145, 55%, 38%)' }}>{confirmedCount} confirmed</span>
-                  {' · '}
-                  <span style={{ fontWeight: 700, color: '#94a3b8' }}>{rejected.size} rejected</span>
-                  {unreviewedCount > 0 && <span style={{ color: 'hsl(38, 90%, 42%)', fontWeight: 600 }}> · {unreviewedCount} pending</span>}
-                </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button
-                    onClick={() => setOpen(false)}
-                    style={{ padding: '8px 16px', borderRadius: '8px', border: '2px solid #e2e8f0', background: 'white', color: '#64748b', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
-                  >
-                    Skip for now
-                  </button>
-                  <button
-                    onClick={handleApplyAll}
-                    disabled={confirmedCount === 0}
-                    style={{
-                      padding: '8px 18px',
-                      borderRadius: '8px',
-                      border: 'none',
-                      background: confirmedCount === 0 ? '#e2e8f0' : 'hsl(350, 80%, 52%)',
-                      color: confirmedCount === 0 ? '#94a3b8' : 'white',
-                      fontSize: '13px',
-                      fontWeight: 700,
-                      cursor: confirmedCount === 0 ? 'not-allowed' : 'pointer',
-                    }}
-                  >
-                    ✓ Apply {confirmedCount} confirmed match{confirmedCount !== 1 ? 'es' : ''}
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {typeof document !== 'undefined' && bell && createPortal(bell, document.body)}
+      {typeof document !== 'undefined' && modal && createPortal(modal, document.body)}
     </>
   );
 }
