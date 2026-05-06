@@ -13,72 +13,186 @@ interface RefundPair {
   isFullRefund: boolean;
 }
 
-function scoreMatch(spend: SpendEntry, credit: SpendEntry): { score: number; reason: string } | null {
+// Learned patterns: category pairs that have been confirmed as refunds before
+const STORAGE_KEY = 'refund_learned_patterns';
+
+interface LearnedPattern {
+  spendCategory: string;
+  creditCategory: string;
+  merchantMatch: 'exact' | 'partial' | 'none'; // what kind of merchant match existed when confirmed
+  count: number;
+}
+
+function loadLearnedPatterns(): LearnedPattern[] {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { return []; }
+}
+
+function saveLearnedPattern(spend: SpendEntry, credit: SpendEntry, merchantMatch: 'exact' | 'partial' | 'none') {
+  const patterns = loadLearnedPatterns();
+  const key = `${spend.category}|${credit.category}|${merchantMatch}`;
+  const existing = patterns.find(p => `${p.spendCategory}|${p.creditCategory}|${p.merchantMatch}` === key);
+  if (existing) { existing.count++; } else { patterns.push({ spendCategory: spend.category, creditCategory: credit.category, merchantMatch, count: 1 }); }
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(patterns)); } catch {}
+}
+
+// Words too generic to count as merchant evidence
+const STOPWORDS = new Set(['the', 'and', 'for', 'via', 'from', 'with', 'ltd', 'inc', 'plc', 'uk', 'gb', 'ref', 'payment', 'purchase', 'order', 'transaction', 'debit', 'credit', 'card', 'online', 'store', 'shop']);
+
+function merchantSimilarity(a: string, b: string): { level: 'exact' | 'strong' | 'weak' | 'none'; word?: string } {
+  const na = a.toLowerCase().trim();
+  const nb = b.toLowerCase().trim();
+  if (!na || !nb) return { level: 'none' };
+  if (na === nb) return { level: 'exact' };
+
+  // Normalise: remove punctuation, split into meaningful words
+  const wordsA = na.replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(w => w.length > 2 && !STOPWORDS.has(w));
+  const wordsB = nb.replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(w => w.length > 2 && !STOPWORDS.has(w));
+
+  if (wordsA.length === 0 || wordsB.length === 0) return { level: 'none' };
+
+  // Strong: any meaningful word is a substring of a word in the other (e.g. "amazon" ↔ "amazon marketplace")
+  const strongMatch = wordsA.find(wa => wordsB.some(wb => wb.includes(wa) || wa.includes(wb)));
+  if (strongMatch) return { level: 'strong', word: strongMatch };
+
+  // Weak: first characters match (e.g. "tesco" ↔ "tesc") — not enough alone
+  const weakMatch = wordsA.find(wa => wordsB.some(wb => wa.startsWith(wb.slice(0, 4)) || wb.startsWith(wa.slice(0, 4))));
+  if (weakMatch) return { level: 'weak', word: weakMatch };
+
+  return { level: 'none' };
+}
+
+function scoreMatch(spend: SpendEntry, credit: SpendEntry, learned: LearnedPattern[]): { score: number; reason: string; merchantMatch: 'exact' | 'partial' | 'none' } | null {
   if ((spend.type ?? 'spend') !== 'spend') return null;
   if (credit.type !== 'credit') return null;
   if (spend.refundPairId || credit.refundPairId) return null;
 
+  // Credit cannot exceed spend
+  if (credit.amount > spend.amount + 0.01) return null;
+
   let score = 0;
   const reasons: string[] = [];
 
+  // ── 1. AMOUNT (most objective signal) ────────────────────────────────────
   const amountDiff = Math.abs(spend.amount - credit.amount);
+  const amountRatio = amountDiff / spend.amount;
+  let amountScore = 0;
   if (amountDiff < 0.01) {
-    score += 40; reasons.push('same amount');
-  } else if (amountDiff / spend.amount < 0.15) {
-    score += 20; reasons.push('similar amount');
-  } else if (credit.amount > spend.amount) {
-    return null;
+    amountScore = 50; reasons.push('exact amount');
+  } else if (amountRatio <= 0.02) {
+    amountScore = 40; reasons.push('near-exact amount');
+  } else if (amountRatio <= 0.10) {
+    amountScore = 25; reasons.push('similar amount');
+  } else if (amountRatio <= 0.25) {
+    amountScore = 10; reasons.push('partial amount');
+  } else {
+    return null; // more than 25% difference — not a refund
   }
+  score += amountScore;
 
-  const spendNote = (spend.note || '').toLowerCase().trim();
-  const creditNote = (credit.note || '').toLowerCase().trim();
-  if (spendNote && creditNote) {
-    if (spendNote === creditNote) {
-      score += 40; reasons.push(`same merchant "${spend.note}"`);
+  // ── 2. MERCHANT / DESCRIPTION ─────────────────────────────────────────────
+  const spendNote = (spend.note || '').trim();
+  const creditNote = (credit.note || '').trim();
+  const bothHaveNotes = spendNote.length > 0 && creditNote.length > 0;
+  const sim = merchantSimilarity(spendNote, creditNote);
+  let merchantMatch: 'exact' | 'partial' | 'none' = 'none';
+
+  if (bothHaveNotes) {
+    if (sim.level === 'exact') {
+      score += 45; reasons.push(`same merchant "${spendNote}"`); merchantMatch = 'exact';
+    } else if (sim.level === 'strong') {
+      score += 30; reasons.push(`merchant match "${sim.word}"`); merchantMatch = 'partial';
+    } else if (sim.level === 'weak') {
+      score += 8; reasons.push('weak merchant overlap'); merchantMatch = 'partial';
     } else {
-      const spendWords = spendNote.split(/\s+/);
-      const creditWords = creditNote.split(/\s+/);
-      const common = spendWords.filter(w => w.length > 3 && creditWords.some(cw => cw.includes(w) || w.includes(cw)));
-      if (common.length > 0) { score += 25; reasons.push(`matching merchant "${common[0]}"`); }
+      // Both have descriptions but they share nothing meaningful.
+      // This is the key rule: penalise heavily — only pass if amount is near-exact AND category matches.
+      score -= 40;
+      reasons.push('different merchants');
+      merchantMatch = 'none';
     }
+  } else if (!spendNote && !creditNote) {
+    // Neither has a description — neutral, rely on category + amount
+    score += 5;
+  }
+  // One has a note, one doesn't — no boost, no penalty
+
+  // ── 3. CATEGORY ───────────────────────────────────────────────────────────
+  const sc = spend.category.toLowerCase();
+  const cc = credit.category.toLowerCase();
+  if (sc === cc) {
+    score += 20; reasons.push('same category');
+  } else if (cc === 'shopping refund' || cc === 'refund' || cc.includes('refund')) {
+    score += 15; reasons.push('refund category');
+  } else if (cc === 'other' || sc === 'other') {
+    // generic — small neutral boost
+    score += 3;
+  } else {
+    // Completely different categories with no merchant match → hard fail
+    if (merchantMatch === 'none' && amountRatio > 0.02) return null;
   }
 
-  if (spend.category.toLowerCase() === credit.category.toLowerCase()) {
-    score += 15; reasons.push('same category');
-  } else if (credit.category.toLowerCase() === 'shopping refund') {
-    score += 10; reasons.push('Shopping Refund credit');
-  }
-
+  // ── 4. DATE PROXIMITY ────────────────────────────────────────────────────
   const daysDiff = Math.abs(new Date(spend.date).getTime() - new Date(credit.date).getTime()) / 86400000;
-  if (daysDiff <= 7) { score += 20; reasons.push(`${Math.round(daysDiff)}d apart`); }
-  else if (daysDiff <= 30) { score += 10; reasons.push(`${Math.round(daysDiff)}d apart`); }
-  else if (daysDiff <= 60) { score += 3; }
+  if (daysDiff <= 3)       { score += 20; reasons.push(`${Math.round(daysDiff)}d apart`); }
+  else if (daysDiff <= 7)  { score += 15; reasons.push(`${Math.round(daysDiff)}d apart`); }
+  else if (daysDiff <= 14) { score += 10; reasons.push(`${Math.round(daysDiff)}d apart`); }
+  else if (daysDiff <= 30) { score += 5;  reasons.push(`${Math.round(daysDiff)}d apart`); }
+  else if (daysDiff <= 60) { score += 2; }
   else return null;
 
-  if (new Date(credit.date) < new Date(spend.date)) score -= 15;
-  if (score < 30) return null;
-  return { score, reason: reasons.join(' · ') };
+  // Credit before spend: possible (pre-authorisation reversal) but less likely
+  if (new Date(credit.date) < new Date(spend.date)) score -= 10;
+
+  // ── 5. LEARNED PATTERN BOOST ─────────────────────────────────────────────
+  const pattern = learned.find(p => p.spendCategory === spend.category && p.creditCategory === credit.category);
+  if (pattern) {
+    const boost = Math.min(pattern.count * 5, 20); // up to +20 for frequently confirmed patterns
+    score += boost;
+    if (boost >= 10) reasons.push('matches your past confirmations');
+  }
+
+  // ── 6. MINIMUM THRESHOLD ─────────────────────────────────────────────────
+  // Without any merchant signal, require near-exact amount + same category (score will be ~70+)
+  // With merchant mismatch, the -40 means we need ~70 from other signals (exact amount + same category + close date)
+  if (score < 40) return null;
+
+  return { score, reason: reasons.filter(r => r !== 'different merchants').join(' · '), merchantMatch };
 }
 
 export function findRefundPairs(entries: SpendEntry[]): RefundPair[] {
+  const learned = loadLearnedPatterns();
   const spends = entries.filter(e => (e.type ?? 'spend') === 'spend' && !e.refundPairId);
   const credits = entries.filter(e => e.type === 'credit' && !e.refundPairId);
   const pairs: RefundPair[] = [];
   const usedS = new Set<string>();
   const usedC = new Set<string>();
-  const candidates: Array<{ spend: SpendEntry; credit: SpendEntry; score: number; reason: string }> = [];
+  const candidates: Array<{ spend: SpendEntry; credit: SpendEntry; score: number; reason: string; merchantMatch: 'exact' | 'partial' | 'none' }> = [];
+
   for (const s of spends) for (const c of credits) {
-    const r = scoreMatch(s, c);
+    const r = scoreMatch(s, c, learned);
     if (r) candidates.push({ spend: s, credit: c, ...r });
   }
   candidates.sort((a, b) => b.score - a.score);
+
   for (const c of candidates) {
     if (usedS.has(c.spend.id) || usedC.has(c.credit.id)) continue;
     usedS.add(c.spend.id); usedC.add(c.credit.id);
     const net = Math.max(0, c.spend.amount - c.credit.amount);
-    pairs.push({ id: `${c.spend.id}-${c.credit.id}`, spend: c.spend, credit: c.credit, confidence: c.score >= 60 ? 'high' : 'medium', reason: c.reason, netAmount: net, isFullRefund: net < 0.01 });
+    // High confidence: strong merchant match OR (near-exact amount + same category with decent score)
+    const isHighConf = c.score >= 75 && (c.merchantMatch !== 'none' || net < 0.01);
+    pairs.push({ id: `${c.spend.id}-${c.credit.id}`, spend: c.spend, credit: c.credit, confidence: isHighConf ? 'high' : 'medium', reason: c.reason, netAmount: net, isFullRefund: net < 0.01 });
   }
   return pairs;
+}
+
+// Called when user confirms a pair — saves the pattern for future learning
+export function learnFromConfirmedPair(spend: SpendEntry, credit: SpendEntry) {
+  const spendNote = (spend.note || '').trim();
+  const creditNote = (credit.note || '').trim();
+  const sim = merchantSimilarity(spendNote, creditNote);
+  const merchantMatch: 'exact' | 'partial' | 'none' =
+    sim.level === 'exact' ? 'exact' : (sim.level === 'strong' || sim.level === 'weak') ? 'partial' : 'none';
+  saveLearnedPattern(spend, credit, merchantMatch);
 }
 
 interface Props { data: BudgetData; onDataChange: (d: BudgetData) => void; }
@@ -135,7 +249,10 @@ export function RefundMatcher({ data, onDataChange }: Props) {
   const applyAll = useCallback(() => {
     let latest = data;
     for (const pair of pairs) {
-      if (confirmed.has(pair.id)) latest = linkRefundPair(pair.spend.id, pair.credit.id);
+      if (confirmed.has(pair.id)) {
+        latest = linkRefundPair(pair.spend.id, pair.credit.id);
+        learnFromConfirmedPair(pair.spend, pair.credit);
+      }
     }
     setPairs(p => p.filter(x => !confirmed.has(x.id) && !rejected.has(x.id)));
     setConfirmed(new Set()); setRejected(new Set());
