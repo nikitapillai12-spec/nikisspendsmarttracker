@@ -28,11 +28,14 @@ export function AutoUnlock({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      let vid = getStoredVaultId();
-      if (!vid) {
-        const existing = await findVaultByPasscode(SHARED_BOOTSTRAP_KEY);
-        vid = existing ?? (await createVault(SHARED_BOOTSTRAP_KEY));
-        if (vid) setStoredVaultId(vid);
+      // Always resolve the canonical shared vault first. If this device has a
+      // stale or stand-alone vault id stored locally, replace it so every
+      // device converges on the same vault and stays in sync.
+      const canonical = await findVaultByPasscode(SHARED_BOOTSTRAP_KEY);
+      let vid = canonical ?? (await createVault(SHARED_BOOTSTRAP_KEY));
+      const stored = getStoredVaultId();
+      if (vid && stored !== vid) {
+        setStoredVaultId(vid);
       }
       if (vid) {
         await migrateLocalDataIfAny();
