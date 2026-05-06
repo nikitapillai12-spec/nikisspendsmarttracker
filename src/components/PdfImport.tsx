@@ -366,21 +366,35 @@ export function PdfImport({ trigger }: { trigger: React.ReactNode }) {
 
           {/* Paste text area */}
           {mode === 'paste' && (
-            <div className="space-y-3">
-              <div className="rounded-xl border border-border bg-secondary/40 p-3 text-xs text-muted-foreground space-y-1">
-                <p className="font-semibold text-foreground">How to copy from AMEX / your bank:</p>
-                <ol className="list-decimal list-inside space-y-0.5">
-                  <li>Open your PDF statement in a browser or PDF viewer</li>
-                  <li>Press <kbd className="bg-muted px-1 rounded text-[10px]">Cmd+A</kbd> (Mac) or <kbd className="bg-muted px-1 rounded text-[10px]">Ctrl+A</kbd> (Windows) to select all</li>
-                  <li>Press <kbd className="bg-muted px-1 rounded text-[10px]">Cmd+C</kbd> / <kbd className="bg-muted px-1 rounded text-[10px]">Ctrl+C</kbd> to copy</li>
-                  <li>Paste it in the box below</li>
-                </ol>
+            <div className="space-y-4">
+              {/* Step-by-step instructions — big, visual, hard to miss */}
+              <div className="rounded-xl border-2 border-primary/20 bg-primary/5 p-4">
+                <p className="font-display font-bold text-sm text-foreground mb-3">How to get text from your bank PDF:</p>
+                <div className="space-y-2">
+                  {[
+                    { step: '1', icon: '📂', text: 'Open your PDF statement in Chrome or Safari (drag it into the browser window)' },
+                    { step: '2', icon: '🖱️', text: <>Click anywhere on the page, then press <kbd className="bg-white border border-border px-1.5 py-0.5 rounded text-[11px] font-mono font-semibold">Cmd+A</kbd> on Mac or <kbd className="bg-white border border-border px-1.5 py-0.5 rounded text-[11px] font-mono font-semibold">Ctrl+A</kbd> on Windows to select all text</> },
+                    { step: '3', icon: '📋', text: <>Press <kbd className="bg-white border border-border px-1.5 py-0.5 rounded text-[11px] font-mono font-semibold">Cmd+C</kbd> or <kbd className="bg-white border border-border px-1.5 py-0.5 rounded text-[11px] font-mono font-semibold">Ctrl+C</kbd> to copy</> },
+                    { step: '4', icon: '⬇️', text: 'Come back here and paste into the box below (Cmd+V / Ctrl+V), then click Parse' },
+                  ].map(({ step, icon, text }) => (
+                    <div key={step} className="flex items-start gap-3">
+                      <div className="shrink-0 w-6 h-6 rounded-full bg-primary text-white text-xs font-black flex items-center justify-center mt-0.5">{step}</div>
+                      <div className="text-xs text-foreground leading-relaxed">
+                        <span className="mr-1">{icon}</span>{text}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-3 pl-9">
+                  Works for AMEX, Natwest, Lloyds, Barclays. On iPhone: open PDF in Files app → share → Copy to Chrome.
+                </p>
               </div>
+
               <textarea
                 value={pasteText}
                 onChange={e => setPasteText(e.target.value)}
                 placeholder="Paste your bank statement text here…"
-                className="w-full h-40 rounded-xl border border-border p-3 text-xs font-mono resize-none focus:outline-none focus:border-primary bg-background"
+                className="w-full h-36 rounded-xl border-2 border-border p-3 text-xs font-mono resize-none focus:outline-none focus:border-primary bg-background transition-colors"
               />
               <Button className="w-full" onClick={handleParse} disabled={!pasteText.trim()}>
                 Parse Transactions
