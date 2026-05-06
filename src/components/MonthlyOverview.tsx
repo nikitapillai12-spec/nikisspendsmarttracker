@@ -6,7 +6,7 @@ import { getMonthsInRange } from '@/lib/date-utils';
 import { getEffectiveMonthlyBudget, getEffectiveCategoryBudget } from '@/lib/budget-store';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  Line, ComposedChart, Cell, Area, LabelList,
+  Line, ComposedChart, Cell, Area, LabelList, ReferenceLine,
 } from 'recharts';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -511,6 +511,109 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
           </div>
         </motion.div>
       )}
+
+      {/* Vacations Budget Chart */}
+      <VacationsChart data={data} />
     </div>
+  );
+}
+
+const VACATION_CATS = ['Flights', 'Travel Spend'];
+
+function VacationsChart({ data }: { data: BudgetData }) {
+  const thisYear = new Date().getFullYear();
+
+  const annualBudget = (data.annualBudgets || []).find(b => b.year === thisYear && b.label === 'Vacations');
+  if (!annualBudget) return null;
+
+  const budget = annualBudget.amount;
+  const cats = annualBudget.categories.length > 0 ? annualBudget.categories : VACATION_CATS;
+
+  // Build cumulative spend by month for the year
+  const yearMonths: string[] = [];
+  for (let m = 1; m <= 12; m++) {
+    yearMonths.push(`${thisYear}-${String(m).padStart(2, '0')}`);
+  }
+
+  let running = 0;
+  const chartData = yearMonths.map(month => {
+    const monthSpend = data.entries
+      .filter(e => e.date.startsWith(month) && (e.type ?? 'spend') === 'spend' && cats.includes(e.category))
+      .reduce((s, e) => s + e.amount, 0);
+    running += monthSpend;
+    return {
+      month: format(new Date(month + '-01'), 'MMM'),
+      monthSpend,
+      cumulative: running,
+      budget,
+      remaining: Math.max(0, budget - running),
+    };
+  });
+
+  // Only show months up to the latest one with data (or current month)
+  const currentMonth = `${thisYear}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+  const visibleData = chartData.filter((_, i) => yearMonths[i] <= currentMonth);
+
+  const totalSpent = running;
+  const pct = budget > 0 ? Math.min(100, (totalSpent / budget) * 100) : 0;
+  const isOver = totalSpent > budget;
+  const remaining = budget - totalSpent;
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}
+      className="bg-card rounded-2xl border border-border p-6 mcm-shadow">
+      <div className="flex items-start justify-between mb-1 flex-wrap gap-2">
+        <div>
+          <h3 className="font-display font-bold text-lg">✈️ Vacations Budget {thisYear}</h3>
+          <p className="text-sm text-muted-foreground">Flights + Travel Spend vs annual budget. Cumulative YTD.</p>
+        </div>
+        <div className={`text-right rounded-xl px-4 py-2 border ${isOver ? 'bg-budget-over/10 border-budget-over/30' : 'bg-budget-under/10 border-budget-under/30'}`}>
+          <div className="text-xs text-muted-foreground">YTD spent</div>
+          <div className={`font-display text-2xl font-bold ${isOver ? 'text-budget-over' : 'text-budget-under'}`}>
+            £{totalSpent.toFixed(0)}
+          </div>
+          <div className="text-xs font-medium text-muted-foreground">of £{budget.toFixed(0)}</div>
+        </div>
+      </div>
+
+      {/* Progress bar */}
+      <div className="mb-4 mt-3">
+        <div className="flex justify-between text-xs text-muted-foreground mb-1">
+          <span>{pct.toFixed(0)}% used</span>
+          <span className={isOver ? 'text-budget-over font-semibold' : 'text-budget-under font-semibold'}>
+            {isOver ? `£${Math.abs(remaining).toFixed(0)} over` : `£${remaining.toFixed(0)} remaining`}
+          </span>
+        </div>
+        <div className="h-3 rounded-full bg-secondary overflow-hidden">
+          <div
+            className="h-full rounded-full transition-all duration-500"
+            style={{
+              width: `${Math.min(100, pct)}%`,
+              background: isOver ? 'hsl(var(--budget-over))' : pct > 80 ? 'hsl(42,75%,50%)' : 'hsl(var(--budget-under))',
+            }}
+          />
+        </div>
+      </div>
+
+      {visibleData.length > 0 && (
+        <div className="h-64">
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={visibleData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <XAxis dataKey="month" tick={{ fontSize: 13 }} />
+              <YAxis tick={{ fontSize: 13 }} tickFormatter={(v) => `£${v}`} />
+              <Tooltip
+                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', fontSize: '13px' }}
+                formatter={(value: number, name: string) => [`£${value.toFixed(2)}`, name]}
+              />
+              <Legend wrapperStyle={{ fontSize: '13px' }} />
+              <Bar dataKey="monthSpend" name="Monthly vacation spend" fill="hsl(280,40%,55%)" radius={[4, 4, 0, 0]} maxBarSize={60} />
+              <Line type="monotone" dataKey="cumulative" name="Cumulative YTD" stroke="hsl(280,60%,40%)" strokeWidth={2.5} dot={{ r: 5, fill: 'hsl(280,60%,40%)' }} />
+              <ReferenceLine y={budget} stroke="hsl(var(--foreground))" strokeDasharray="8 4" strokeWidth={2} label={{ value: `Budget £${budget.toFixed(0)}`, position: 'insideTopRight', fontSize: 11, fontWeight: 700 }} />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+    </motion.div>
   );
 }

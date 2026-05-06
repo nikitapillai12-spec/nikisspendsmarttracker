@@ -1,4 +1,4 @@
-import { BudgetData, SpendEntry, CustomCategory, RecurringPayment, InvestmentEntry, DEFAULT_INVESTMENT_PLATFORMS } from './budget-types';
+import { BudgetData, SpendEntry, CustomCategory, RecurringPayment, InvestmentEntry, AnnualBudget, DEFAULT_INVESTMENT_PLATFORMS } from './budget-types';
 import { supabase } from '@/integrations/supabase/client';
 import { getStoredVaultId } from './vault-store';
 
@@ -8,6 +8,7 @@ let cache: BudgetData = {
   monthlyBudgets: [],
   customCategories: [],
   categoryBudgets: [],
+  annualBudgets: [],
   recurringPayments: [],
   investmentEntries: [],
   investmentPlatforms: [],
@@ -39,7 +40,7 @@ export async function initStore(): Promise<BudgetData> {
     return cache;
   }
   try {
-    const [entriesRes, mbRes, cbRes, ccRes, rpRes, ieRes, ipRes] = await Promise.all([
+    const [entriesRes, mbRes, cbRes, ccRes, rpRes, ieRes, ipRes, abRes] = await Promise.all([
       supabase.from('spend_entries').select('*').eq('vault_id', vid),
       supabase.from('monthly_budgets').select('*').eq('vault_id', vid),
       supabase.from('category_budgets').select('*').eq('vault_id', vid),
@@ -47,6 +48,7 @@ export async function initStore(): Promise<BudgetData> {
       supabase.from('recurring_payments').select('*').eq('vault_id', vid),
       supabase.from('investment_entries').select('*').eq('vault_id', vid),
       supabase.from('investment_platforms').select('*').eq('vault_id', vid),
+      supabase.from('annual_budgets').select('*').eq('vault_id', vid),
     ]);
 
     cache = {
@@ -68,6 +70,12 @@ export async function initStore(): Promise<BudgetData> {
         category: r.category,
         month: r.month,
         amount: Number(r.amount),
+      })),
+      annualBudgets: (abRes.data || []).map(r => ({
+        year: Number(r.year),
+        label: r.label,
+        amount: Number(r.amount),
+        categories: r.categories as string[],
       })),
       customCategories: (ccRes.data || []).map(r => ({
         name: r.name,
@@ -132,7 +140,7 @@ async function refetchAll() {
   const vid = getStoredVaultId();
   if (!vid) return;
   try {
-    const [entriesRes, mbRes, cbRes, ccRes, rpRes, ieRes, ipRes] = await Promise.all([
+    const [entriesRes, mbRes, cbRes, ccRes, rpRes, ieRes, ipRes, abRes] = await Promise.all([
       supabase.from('spend_entries').select('*').eq('vault_id', vid),
       supabase.from('monthly_budgets').select('*').eq('vault_id', vid),
       supabase.from('category_budgets').select('*').eq('vault_id', vid),
@@ -140,6 +148,7 @@ async function refetchAll() {
       supabase.from('recurring_payments').select('*').eq('vault_id', vid),
       supabase.from('investment_entries').select('*').eq('vault_id', vid),
       supabase.from('investment_platforms').select('*').eq('vault_id', vid),
+      supabase.from('annual_budgets').select('*').eq('vault_id', vid),
     ]);
     cache = {
       entries: (entriesRes.data || []).map(r => ({
@@ -155,6 +164,9 @@ async function refetchAll() {
       monthlyBudgets: (mbRes.data || []).map(r => ({ month: r.month, amount: Number(r.amount) })),
       categoryBudgets: (cbRes.data || []).map(r => ({
         category: r.category, month: r.month, amount: Number(r.amount),
+      })),
+      annualBudgets: (abRes.data || []).map(r => ({
+        year: Number(r.year), label: r.label, amount: Number(r.amount), categories: r.categories as string[],
       })),
       customCategories: (ccRes.data || []).map(r => ({
         name: r.name, emoji: r.emoji, color: r.color,
@@ -204,6 +216,7 @@ function setupRealtime() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'recurring_payments', filter }, scheduleRefetch)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'investment_entries', filter }, scheduleRefetch)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'investment_platforms', filter }, scheduleRefetch)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'annual_budgets', filter }, scheduleRefetch)
     .subscribe();
 }
 
@@ -544,6 +557,33 @@ export function deleteInvestmentEntry(id: string): BudgetData {
   supabase.from('investment_entries').delete().eq('id', id)
     .then(({ error }) => { if (error) console.error('deleteInvestmentEntry sync', error); });
   return cache;
+}
+
+// ---------- Annual budgets ----------
+export function setAnnualBudget(budget: AnnualBudget): BudgetData {
+  if (!cache.annualBudgets) cache.annualBudgets = [];
+  const idx = cache.annualBudgets.findIndex(b => b.year === budget.year && b.label === budget.label);
+  if (idx >= 0) cache.annualBudgets[idx] = budget;
+  else cache.annualBudgets.push(budget);
+  notify();
+  supabase.from('annual_budgets').upsert(
+    { vault_id: vaultId(), year: budget.year, label: budget.label, amount: budget.amount, categories: budget.categories },
+    { onConflict: 'vault_id,year,label' }
+  ).then(({ error }) => { if (error) console.error('setAnnualBudget sync', error); });
+  return cache;
+}
+
+export function deleteAnnualBudget(year: number, label: string): BudgetData {
+  cache.annualBudgets = (cache.annualBudgets || []).filter(b => !(b.year === year && b.label === label));
+  notify();
+  supabase.from('annual_budgets').delete()
+    .eq('vault_id', vaultId()).eq('year', year).eq('label', label)
+    .then(({ error }) => { if (error) console.error('deleteAnnualBudget sync', error); });
+  return cache;
+}
+
+export function getAnnualBudget(year: number, label: string): AnnualBudget | null {
+  return (cache.annualBudgets || []).find(b => b.year === year && b.label === label) ?? null;
 }
 
 // ---------- Investment platforms ----------

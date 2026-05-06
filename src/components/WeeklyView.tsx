@@ -7,7 +7,7 @@ import { RecurringPaymentsManager } from './RecurringPaymentsManager';
 import { InvestmentsManager } from './InvestmentsManager';
 import { BudgetData, Category, SpendEntry, EntryType, RecurringPayment, getAllCategories, getCategoryEmoji, getCategoryColor, getRecurringForMonth, signedAmount, shouldDistributeWeekly } from '@/lib/budget-types';
 import { getWeekStart, getWeekEnd, getWeekDays, formatDate, formatMonth, formatDisplayMonth, navigateWeek, getWeeklyBudget, weeksTouchingMonth, recurringDisplayDateInWeek, getWeekRepresentativeDatesForMonth } from '@/lib/date-utils';
-import { addEntry, updateEntry, deleteEntry, getMonthlyBudget, setMonthlyBudget, setCategoryBudget, deleteCategoryBudget, getEffectiveCategoryBudget } from '@/lib/budget-store';
+import { addEntry, updateEntry, deleteEntry, getMonthlyBudget, setMonthlyBudget, setCategoryBudget, deleteCategoryBudget, getEffectiveCategoryBudget, setAnnualBudget, getAnnualBudget } from '@/lib/budget-store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -23,6 +23,7 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
   const [budgetDialogOpen, setBudgetDialogOpen] = useState(false);
   const [catBudgetInputs, setCatBudgetInputs] = useState<Record<string, string>>({});
   const [budgetMode, setBudgetMode] = useState<'total' | 'categories'>('total');
+  const [vacationsInput, setVacationsInput] = useState('');
 
   const weekEnd = getWeekEnd(weekStart);
   const days = getWeekDays(weekStart);
@@ -128,6 +129,9 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
     });
     setCatBudgetInputs(init);
     setBudgetMode(hasAnyCat && !currentBudget ? 'categories' : 'total');
+    const year = new Date(weekStart).getFullYear();
+    const vab = getAnnualBudget(year, 'Vacations');
+    setVacationsInput(vab ? vab.amount.toString() : '');
     setBudgetDialogOpen(true);
   };
 
@@ -160,6 +164,13 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
         latest = setMonthlyBudget(month, sum);
       }
     }
+    // Save vacations annual budget
+    const year = new Date(weekStart).getFullYear();
+    const vacVal = parseFloat(vacationsInput);
+    if (!isNaN(vacVal) && vacVal > 0) {
+      latest = setAnnualBudget({ year, label: 'Vacations', amount: vacVal, categories: ['Flights', 'Travel Spend'] });
+    }
+
     onDataChange(latest);
     setBudgetDialogOpen(false);
     setBudgetInput('');
@@ -303,6 +314,24 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
                     </div>
                   </div>
                 )}
+
+                {/* Annual Vacations budget */}
+                <div className="border-t border-border pt-4">
+                  <label className="text-sm font-medium flex items-center gap-1.5 mb-1.5">
+                    ✈️ Annual Vacations budget ({new Date(weekStart).getFullYear()})
+                  </label>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Covers Flights + Travel Spend. Tracked separately in the Time Series view.
+                  </p>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={vacationsInput}
+                    onChange={(e) => setVacationsInput(e.target.value)}
+                    placeholder="e.g. 5000"
+                    onKeyDown={(e) => e.key === 'Enter' && handleSetBudget()}
+                  />
+                </div>
 
                 <Button className="w-full" onClick={handleSetBudget}>
                   Save Budgets

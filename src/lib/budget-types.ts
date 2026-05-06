@@ -114,11 +114,20 @@ export interface CategoryBudget {
   amount: number;
 }
 
+export interface AnnualBudget {
+  year: number;
+  label: string; // e.g. "Vacations"
+  amount: number;
+  /** Categories whose spend counts toward this budget */
+  categories: string[];
+}
+
 export interface BudgetData {
   entries: SpendEntry[];
   monthlyBudgets: MonthlyBudget[];
   customCategories: CustomCategory[];
   categoryBudgets?: CategoryBudget[];
+  annualBudgets?: AnnualBudget[];
   recurringPayments?: RecurringPayment[];
   investmentEntries?: InvestmentEntry[];
   investmentPlatforms?: string[];
