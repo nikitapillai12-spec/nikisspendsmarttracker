@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Wallet, BarChart3, Settings, CloudUpload, RefreshCw } from 'lucide-react';
+import { Wallet, BarChart3, Settings, CloudUpload, RefreshCw, Database } from 'lucide-react';
 import { WeeklyView } from '@/components/WeeklyView';
 import { MonthlyOverview } from '@/components/MonthlyOverview';
 import { AutoUnlock } from '@/components/AutoUnlock';
 import { BudgetData } from '@/lib/budget-types';
-import { getAll, subscribeStore, initStore, migrateLocalDataIfAny } from '@/lib/budget-store';
+import { getAll, subscribeStore, initStore, migrateLocalDataIfAny, maybeRunDailyBackup } from '@/lib/budget-store';
 import { getStoredVaultId } from '@/lib/vault-store';
 import { toast } from '@/components/ui/sonner';
 import {
@@ -14,6 +14,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { BackupSettings } from '@/components/BackupSettings';
 import mcmLogo from '@/assets/mcm-logo.png';
 
 type Tab = 'weekly' | 'timeseries';
@@ -28,7 +29,11 @@ const Index = () => {
     // Defensive re-hydration in case Index mounted before PasscodeGate's initStore
     // finished, or the cache was cleared (e.g. HMR). Safe to call multiple times.
     if (getStoredVaultId()) {
-      initStore().then(d => setData({ ...d }));
+      initStore().then(d => {
+        setData({ ...d });
+        // Fire-and-forget daily auto-backup; no-op if already done today
+        maybeRunDailyBackup();
+      });
     }
     return () => { unsub(); };
   }, []);
@@ -74,6 +79,13 @@ const Index = () => {
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  <BackupSettings
+                    trigger={
+                      <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                        <Database className="w-4 h-4 mr-2" /> Backups (Download / Restore)
+                      </DropdownMenuItem>
+                    }
+                  />
                   <DropdownMenuItem onClick={async () => {
                     const did = await migrateLocalDataIfAny();
                     await initStore();
