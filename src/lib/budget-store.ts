@@ -575,7 +575,7 @@ export async function fetchCloudBackup(id: string): Promise<BudgetData | null> {
   const { data, error } = await supabase
     .from('backup_snapshots').select('data').eq('id', id).maybeSingle();
   if (error || !data) { console.error('fetchCloudBackup', error); return null; }
-  return data.data as BudgetData;
+  return data.data as unknown as BudgetData;
 }
 
 /** Restore a backup payload into the cloud DB for the current vault.
