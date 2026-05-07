@@ -357,7 +357,7 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
               </ComposedChart>
             </ResponsiveContainer>
           </div>
-          </div>{/* end overflow-x-auto */}
+          </div>
         )}
       </motion.div>
 
@@ -392,7 +392,7 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
               </ComposedChart>
             </ResponsiveContainer>
           </div>
-          </div>{/* end overflow-x-auto */}
+          </div>
         )}
       </motion.div>
 
@@ -481,7 +481,7 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
               </ComposedChart>
             </ResponsiveContainer>
           </div>
-          </div>{/* end overflow-x-auto */}
+          </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
             {budgetChartData.map((d, i) => (
               <motion.div key={d.month} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.05 }}
@@ -512,7 +512,7 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
               </ComposedChart>
             </ResponsiveContainer>
           </div>
-          </div>{/* end overflow-x-auto */}
+          </div>
         </motion.div>
       )}
 
@@ -617,7 +617,7 @@ function VacationsChart({ data }: { data: BudgetData }) {
             </ComposedChart>
           </ResponsiveContainer>
         </div>
-          </div>{/* end overflow-x-auto */}
+          </div>
       )}
     </motion.div>
   );

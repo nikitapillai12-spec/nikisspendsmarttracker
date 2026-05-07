@@ -14,6 +14,41 @@ export type Database = {
   }
   public: {
     Tables: {
+      annual_budgets: {
+        Row: {
+          amount: number
+          categories: Json
+          label: string
+          updated_at: string
+          vault_id: string
+          year: number
+        }
+        Insert: {
+          amount?: number
+          categories?: Json
+          label: string
+          updated_at?: string
+          vault_id: string
+          year: number
+        }
+        Update: {
+          amount?: number
+          categories?: Json
+          label?: string
+          updated_at?: string
+          vault_id?: string
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "annual_budgets_vault_id_fkey"
+            columns: ["vault_id"]
+            isOneToOne: false
+            referencedRelation: "vaults"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       backup_snapshots: {
         Row: {
           created_at: string
@@ -223,6 +258,32 @@ export type Database = {
           vault_id?: string
         }
         Relationships: []
+      }
+      refund_learned_patterns: {
+        Row: {
+          patterns: Json
+          updated_at: string
+          vault_id: string
+        }
+        Insert: {
+          patterns?: Json
+          updated_at?: string
+          vault_id: string
+        }
+        Update: {
+          patterns?: Json
+          updated_at?: string
+          vault_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "refund_learned_patterns_vault_id_fkey"
+            columns: ["vault_id"]
+            isOneToOne: true
+            referencedRelation: "vaults"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       spend_entries: {
         Row: {

@@ -349,7 +349,6 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
           <CategoryManager data={data} onDataChange={onDataChange} />
         </div>
       </div>{/* end Row 2 */}
-      </div>{/* end space-y-3 */}
 
       {/* Weekly Summary Stats (Item 3) */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
