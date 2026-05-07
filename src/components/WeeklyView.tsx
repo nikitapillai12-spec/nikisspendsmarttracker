@@ -419,5 +419,6 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
         })}
       </div>
       </div>
+    </div>
   );
 }
