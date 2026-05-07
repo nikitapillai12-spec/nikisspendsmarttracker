@@ -331,7 +331,7 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
         <h3 className="font-display font-bold text-lg mb-1">Monthly Net Spend by Category</h3>
         <p className="text-sm text-muted-foreground mb-4">Stacked by category. Hover for breakdown + suggestions.</p>
         {stackedData.length > 0 && (
-          <div className="h-80">
+          <div className="overflow-x-auto -mx-2"><div className="h-80" style={{minWidth:320}}>
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={stackedData} barCategoryGap="20%">
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -357,6 +357,7 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
               </ComposedChart>
             </ResponsiveContainer>
           </div>
+          </div>{/* end overflow-x-auto */}
         )}
       </motion.div>
 
@@ -366,7 +367,7 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
         <h3 className="font-display font-bold text-lg mb-1">Monthly Breakdown — Spend / Credits / Net / Investments</h3>
         <p className="text-sm text-muted-foreground mb-4">Click any bar or label to drill into that month.</p>
         {fourBarData.length > 0 && (
-          <div className="h-80">
+          <div className="overflow-x-auto -mx-2"><div className="h-80" style={{minWidth:320}}>
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={fourBarData} barCategoryGap="15%">
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -391,6 +392,7 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
               </ComposedChart>
             </ResponsiveContainer>
           </div>
+          </div>{/* end overflow-x-auto */}
         )}
       </motion.div>
 
@@ -415,7 +417,7 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
                 <h3 className="font-display text-2xl">{drillInsight.displayMonth} — Detail</h3>
                 <Button variant="ghost" size="icon" onClick={() => setDrillMonth(null)}><X className="w-5 h-5" /></Button>
               </div>
-              <div className="h-64 mb-6">
+              <div className="overflow-x-auto -mx-2 mb-6"><div className="h-64" style={{minWidth:320}}>
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={drillBarData} barCategoryGap="20%">
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -430,7 +432,7 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
-              </div>
+              </div></div>{/* end overflow-x-auto drill chart */}
               <div className="grid grid-cols-2 gap-3">
                 {drillBarData.map(d => (
                   <div key={d.name} className="rounded-xl border border-border p-3 text-center">
@@ -461,7 +463,7 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
           className="bg-card rounded-2xl border border-border p-6 mcm-shadow">
           <h3 className="font-display font-bold text-lg mb-1">Actual Spend vs Monthly Budget</h3>
           <p className="text-sm text-muted-foreground mb-4">Bars show actual spend, dashed line = budget, solid line = trend. Hover for insights + suggestions.</p>
-          <div className="h-80">
+          <div className="overflow-x-auto -mx-2"><div className="h-80" style={{minWidth:320}}>
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={budgetChartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -479,6 +481,7 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
               </ComposedChart>
             </ResponsiveContainer>
           </div>
+          </div>{/* end overflow-x-auto */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
             {budgetChartData.map((d, i) => (
               <motion.div key={d.month} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.05 }}
@@ -498,7 +501,7 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
           className="bg-card rounded-2xl border border-border p-6 mcm-shadow">
           <h3 className="font-display font-bold text-lg mb-1">Cumulative Savings Trend</h3>
           <p className="text-sm text-muted-foreground mb-4">Running total of savings vs overspend over time</p>
-          <div className="h-64">
+          <div className="overflow-x-auto -mx-2"><div className="h-64" style={{minWidth:320}}>
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={cumulativeData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -509,6 +512,7 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
               </ComposedChart>
             </ResponsiveContainer>
           </div>
+          </div>{/* end overflow-x-auto */}
         </motion.div>
       )}
 
@@ -596,7 +600,7 @@ function VacationsChart({ data }: { data: BudgetData }) {
       </div>
 
       {visibleData.length > 0 && (
-        <div className="h-64">
+        <div className="overflow-x-auto -mx-2"><div className="h-64" style={{minWidth:320}}>
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={visibleData}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -613,6 +617,7 @@ function VacationsChart({ data }: { data: BudgetData }) {
             </ComposedChart>
           </ResponsiveContainer>
         </div>
+          </div>{/* end overflow-x-auto */}
       )}
     </motion.div>
   );

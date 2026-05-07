@@ -188,34 +188,38 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <Button variant="outline" size="icon" className="h-10 w-10 rounded-full border border-border mcm-shadow-sm" onClick={() => setWeekStart(navigateWeek(weekStart, 'prev'))}>
-            <ChevronLeft className="w-4 h-4" />
-          </Button>
-          <div className="text-center">
-            <h2 className="font-display font-normal text-2xl tracking-wide leading-none">
-              {formatDate(weekStart).slice(5)} – {formatDate(weekEnd).slice(5)}
-            </h2>
-            <p className="text-sm text-muted-foreground font-serif-mcm italic mt-1">{formatDisplayMonth(weekStart)}</p>
+      <div className="space-y-3">
+        {/* Row 1: week navigation */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="icon" className="h-9 w-9 rounded-full border border-border mcm-shadow-sm shrink-0" onClick={() => setWeekStart(navigateWeek(weekStart, 'prev'))}>
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <div className="text-center">
+              <h2 className="font-display font-normal text-lg sm:text-2xl tracking-wide leading-none">
+                {formatDate(weekStart).slice(5)} – {formatDate(weekEnd).slice(5)}
+              </h2>
+              <p className="text-xs sm:text-sm text-muted-foreground font-serif-mcm italic mt-0.5">{formatDisplayMonth(weekStart)}</p>
+            </div>
+            <Button variant="outline" size="icon" className="h-9 w-9 rounded-full border border-border mcm-shadow-sm shrink-0" onClick={() => setWeekStart(navigateWeek(weekStart, 'next'))}>
+              <ChevronRight className="w-4 h-4" />
+            </Button>
           </div>
-          <Button variant="outline" size="icon" className="h-10 w-10 rounded-full border border-border mcm-shadow-sm" onClick={() => setWeekStart(navigateWeek(weekStart, 'next'))}>
-            <ChevronRight className="w-4 h-4" />
-          </Button>
-          <Button variant="ghost" size="sm" className="text-sm" onClick={() => setWeekStart(getWeekStart(new Date()))}>
+          <Button variant="ghost" size="sm" className="text-xs sm:text-sm shrink-0" onClick={() => setWeekStart(getWeekStart(new Date()))}>
             Today
           </Button>
         </div>
 
-        <div className="flex items-center gap-3 flex-wrap">
+        {/* Row 2: totals + action buttons */}
+        <div className="flex items-center gap-2 flex-wrap">
           <motion.div
             key={weekTotal}
             initial={{ scale: 0.9 }}
             animate={{ scale: 1 }}
-            className="px-4 py-2 rounded-lg bg-secondary border border-border mcm-shadow-sm"
+            className="px-3 py-1.5 rounded-lg bg-secondary border border-border mcm-shadow-sm"
           >
-            <span className="text-xs text-muted-foreground uppercase tracking-widest">Week Total</span>
-            <p className="font-display font-normal text-2xl tracking-wide leading-none mt-0.5">£{weekTotal.toFixed(2)}</p>
+            <span className="text-[10px] text-muted-foreground uppercase tracking-widest">Week Total</span>
+            <p className="font-display font-normal text-xl sm:text-2xl tracking-wide leading-none mt-0.5">£{weekTotal.toFixed(2)}</p>
           </motion.div>
 
           {weeklyBudget !== null && budgetDiff !== null && (
@@ -223,16 +227,16 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
               key={budgetDiff}
               initial={{ scale: 0.9 }}
               animate={{ scale: 1 }}
-              className={`px-4 py-2 rounded-lg border border-border mcm-shadow-sm ${
+              className={`px-3 py-1.5 rounded-lg border border-border mcm-shadow-sm ${
                 budgetDiff >= 0
                   ? 'bg-budget-under/10 text-budget-under'
                   : 'bg-budget-over/10 text-budget-over'
               }`}
             >
-              <span className="text-xs opacity-75 uppercase tracking-widest">
-                Budget: £{weeklyBudget.toFixed(2)}/wk
+              <span className="text-[10px] opacity-75 uppercase tracking-widest">
+                £{weeklyBudget.toFixed(0)}/wk
               </span>
-              <p className="font-display font-normal text-2xl tracking-wide leading-none mt-0.5">
+              <p className="font-display font-normal text-xl sm:text-2xl tracking-wide leading-none mt-0.5">
                 {budgetDiff >= 0 ? '✅' : '🔴'} £{Math.abs(budgetDiff).toFixed(2)} {budgetDiff >= 0 ? 'under' : 'over'}
               </p>
             </motion.div>
@@ -344,7 +348,8 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
           <InvestmentsManager data={data} onDataChange={onDataChange} />
           <CategoryManager data={data} onDataChange={onDataChange} />
         </div>
-      </div>
+      </div>{/* end Row 2 */}
+      </div>{/* end space-y-3 */}
 
       {/* Weekly Summary Stats (Item 3) */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -385,7 +390,8 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
+      <div className="overflow-x-auto -mx-2 px-2 pb-2">
+      <div className="grid grid-cols-7 gap-3" style={{ minWidth: '560px' }}>
         {days.map((day, i) => {
           const dateStr = formatDate(day);
           const dayEntries = data.entries.filter(e => e.date === dateStr);
@@ -412,6 +418,7 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
             </motion.div>
           );
         })}
+      </div>
       </div>
     </div>
   );

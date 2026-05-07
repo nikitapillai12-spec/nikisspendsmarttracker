@@ -57,28 +57,27 @@ const Index = () => {
 
       {/* Header */}
       <header className="border-b-2 border-border bg-white/95 backdrop-blur-sm sticky top-0 z-50" style={{ boxShadow: '0 2px 0 hsl(var(--border)), 0 4px 20px -8px hsl(230 25% 12% / 0.10)' }}>
-        <div className="container max-w-7xl mx-auto px-4 py-3">
-          <div className="flex items-center justify-between">
+        <div className="container max-w-7xl mx-auto px-3 py-2">
+          <div className="flex items-center justify-between gap-2">
 
-            {/* Logo — Memphis bold wordmark */}
-            <div className="flex items-center gap-3">
-              {/* Geometric logo mark — concentric square + dot */}
-              <div className="relative w-10 h-10 shrink-0">
+            {/* Logo — compact on mobile */}
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="relative w-8 h-8 shrink-0">
                 <div className="absolute inset-0 rounded-md bg-[hsl(var(--primary))]" />
-                <div className="absolute inset-1.5 rounded-sm bg-white" />
+                <div className="absolute inset-1 rounded-sm bg-white" />
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-2.5 h-2.5 rounded-full bg-[hsl(var(--primary))]" />
+                  <div className="w-2 h-2 rounded-full bg-[hsl(var(--primary))]" />
                 </div>
               </div>
-              <div>
-                <h1 className="font-display text-3xl leading-none tracking-tight" style={{ fontWeight: 900, letterSpacing: '-0.02em' }}>
+              <div className="min-w-0">
+                <h1 className="font-display leading-none tracking-tight text-xl sm:text-3xl" style={{ fontWeight: 900, letterSpacing: '-0.02em' }}>
                   SpendSmart
                 </h1>
-                <p className="text-xs text-muted-foreground font-body mt-0.5 tracking-wide">Stay on top of what you spend on</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground font-body mt-0.5 tracking-wide hidden sm:block">Stay on top of what you spend on</p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 shrink-0">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button className="p-2 rounded-lg border-2 border-border bg-white hover:bg-secondary transition-colors mcm-shadow-sm">
@@ -116,29 +115,29 @@ const Index = () => {
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              {/* Tab Switcher — Memphis pill with bold text */}
-              <div className="flex rounded-lg bg-secondary p-1 gap-1 border-2 border-border mcm-shadow-sm">
+              {/* Tab Switcher */}
+              <div className="flex rounded-lg bg-secondary p-0.5 gap-0.5 border-2 border-border mcm-shadow-sm">
                 <button
                   onClick={() => setTab('weekly')}
-                  className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-semibold tracking-wide transition-all ${
+                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs sm:text-sm font-semibold tracking-wide transition-all ${
                     tab === 'weekly'
                       ? 'bg-[hsl(var(--primary))] text-white shadow-sm'
                       : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   <Wallet className="w-3.5 h-3.5" />
-                  Weekly
+                  <span>Weekly</span>
                 </button>
                 <button
                   onClick={() => setTab('timeseries')}
-                  className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-semibold tracking-wide transition-all ${
+                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs sm:text-sm font-semibold tracking-wide transition-all ${
                     tab === 'timeseries'
                       ? 'bg-[hsl(var(--accent))] text-white shadow-sm'
                       : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   <BarChart3 className="w-3.5 h-3.5" />
-                  Time Series
+                  <span>Charts</span>
                 </button>
               </div>
             </div>
@@ -152,7 +151,7 @@ const Index = () => {
       </header>
 
       {/* Content */}
-      <main className="container max-w-7xl mx-auto px-4 py-6 relative z-10">
+      <main className="container max-w-7xl mx-auto px-2 sm:px-4 py-4 sm:py-6 relative z-10">
         {tab === 'weekly' ? (
           <div key="weekly">
             <WeeklyView data={data} onDataChange={refreshData} />
