@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Wallet, BarChart3, Settings, CloudUpload, RefreshCw, Database } from 'lucide-react';
 import { WeeklyView } from '@/components/WeeklyView';
 import { MonthlyOverview } from '@/components/MonthlyOverview';
-import { AutoUnlock } from '@/components/AutoUnlock';
+import { PasscodeGate } from '@/components/PasscodeGate';
 import { BudgetData } from '@/lib/budget-types';
 import { getAll, subscribeStore, initStore, migrateLocalDataIfAny, maybeRunDailyBackup } from '@/lib/budget-store';
 import { getStoredVaultId } from '@/lib/vault-store';
