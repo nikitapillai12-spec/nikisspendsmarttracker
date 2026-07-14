@@ -355,7 +355,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      create_vault: { Args: { _hash: string }; Returns: string }
+      current_vault_id: { Args: never; Returns: string }
+      find_vault_id_by_passcode: { Args: { _hash: string }; Returns: string }
+      update_vault_passcode: {
+        Args: { _current_hash: string; _new_hash: string; _vault_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never
