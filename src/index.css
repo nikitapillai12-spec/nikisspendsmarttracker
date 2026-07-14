@@ -110,6 +110,51 @@
   }
 }
 
+/* iPhone-optimized typography & spacing.
+   Kicks in below the Tailwind `sm` breakpoint so it only affects phones. */
+@media (max-width: 639px) {
+  html {
+    /* Slightly larger root so rem-based spacing/text breathes on small screens. */
+    font-size: 17px;
+  }
+  body {
+    font-size: 16px;
+    line-height: 1.6;
+    letter-spacing: 0.005em;
+  }
+
+  /* Give every "extra-small" label a readable floor. Tailwind's text-xs (12px)
+     is uncomfortable on iPhone; lift to 13px with looser leading. */
+  .text-xs { font-size: 0.8125rem; line-height: 1.4; }
+  .text-sm { font-size: 0.9375rem; line-height: 1.5; }
+  .text-base { font-size: 1rem; line-height: 1.55; }
+  .text-lg { font-size: 1.125rem; line-height: 1.45; }
+  .text-xl { font-size: 1.25rem; line-height: 1.35; }
+  .text-2xl { font-size: 1.5rem; line-height: 1.25; }
+  .text-3xl { font-size: 1.75rem; line-height: 1.2; }
+
+  h1, h2, h3, h4, h5, h6 { line-height: 1.2; }
+
+  /* Loosen dense stacks so rows aren't jammed together. */
+  .space-y-1 > * + * { margin-top: 0.375rem; }
+  .space-y-2 > * + * { margin-top: 0.625rem; }
+  .space-y-3 > * + * { margin-top: 0.875rem; }
+  .space-y-4 > * + * { margin-top: 1.125rem; }
+
+  /* Nudge default padding on cards/containers upward slightly. */
+  .p-2 { padding: 0.625rem; }
+  .p-3 { padding: 0.875rem; }
+  .p-4 { padding: 1.125rem; }
+
+  /* Buttons/inputs feel cramped at default heights on iPhone; expand hit area. */
+  button, [role="button"], input, select, textarea {
+    font-size: max(1rem, 16px); /* prevents iOS Safari zoom on focus */
+  }
+
+  /* Memphis tag labels tend to be tiny — make the uppercase letters readable. */
+  .memphis-tag, .memphis-tag-teal { font-size: 0.7rem; padding: 3px 9px; }
+}
+
 @layer utilities {
   .font-display   { font-family: var(--font-display); font-weight: 700; }
   .font-body      { font-family: var(--font-body); }
