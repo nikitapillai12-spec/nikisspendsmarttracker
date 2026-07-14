@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Pencil, Trash2, Check, X, TrendingUp, Link, Link2Off } from 'lucide-react';
+import { Plus, Pencil, Trash2, Check, X, TrendingUp, Link, Link2Off, ChevronDown } from 'lucide-react';
 import { SpendEntry, Category, CustomCategory, EntryType, RecurringPayment, getAllCategories, getCategoryColor, getCategoryEmoji, signedAmount } from '@/lib/budget-types';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { formatDisplayDate, isToday } from '@/lib/date-utils';
@@ -43,6 +43,10 @@ export function DayBox({ date, dateStr, entries, customCategories, allEntries, r
   const total = entries.reduce((s, e) => s + signedAmount(e), 0);
   const today = isToday(date);
   const allCategories = getAllCategories(customCategories, entryType);
+
+  // Mobile-only: collapse empty days by default to keep the vertical list short.
+  const hasContent = entries.length > 0 || (recurringSplits && recurringSplits.length > 0);
+  const [expanded, setExpanded] = useState<boolean>(hasContent || today);
 
   const switchType = (t: EntryType) => {
     setEntryType(t);
@@ -191,7 +195,12 @@ export function DayBox({ date, dateStr, entries, customCategories, allEntries, r
       animate={{ opacity: 1, y: 0 }}
       className={`rounded-xl border border-border p-4 transition-all bg-card mcm-shadow hover:-translate-y-0.5 ${today ? 'bg-primary/10' : ''}`}
     >
-      <div className="flex items-center justify-between mb-3">
+      <button
+        type="button"
+        onClick={() => setExpanded(v => !v)}
+        className="flex items-center justify-between mb-3 w-full text-left lg:pointer-events-none"
+        aria-expanded={expanded}
+      >
         <div>
           <h3 className="font-display font-normal text-lg tracking-wide leading-none">
             {formatDisplayDate(date)}
@@ -200,17 +209,25 @@ export function DayBox({ date, dateStr, entries, customCategories, allEntries, r
             <span className="text-sm font-semibold text-primary font-serif-mcm italic">✦ Today</span>
           )}
         </div>
-        {total > 0 && (
-          <motion.span key={total} initial={{ scale: 0.8 }} animate={{ scale: 1 }} className="font-display font-normal text-2xl text-primary tracking-wide">
-            £{total.toFixed(2)}
-          </motion.span>
-        )}
-        {total < 0 && (
-          <motion.span key={total} initial={{ scale: 0.8 }} animate={{ scale: 1 }} className="font-display font-normal text-2xl tracking-wide text-budget-under">
-            -£{Math.abs(total).toFixed(2)}
-          </motion.span>
-        )}
-      </div>
+        <div className="flex items-center gap-2">
+          {total > 0 && (
+            <motion.span key={total} initial={{ scale: 0.8 }} animate={{ scale: 1 }} className="font-display font-normal text-2xl text-primary tracking-wide">
+              £{total.toFixed(2)}
+            </motion.span>
+          )}
+          {total < 0 && (
+            <motion.span key={total} initial={{ scale: 0.8 }} animate={{ scale: 1 }} className="font-display font-normal text-2xl tracking-wide text-budget-under">
+              -£{Math.abs(total).toFixed(2)}
+            </motion.span>
+          )}
+          {total === 0 && !hasContent && (
+            <span className="text-xs text-muted-foreground italic lg:hidden">Tap to add</span>
+          )}
+          <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform lg:hidden ${expanded ? 'rotate-180' : ''}`} />
+        </div>
+      </button>
+
+      <div className={expanded ? '' : 'hidden lg:block'}>
 
       {/* Refund suggestion popup */}
       <AnimatePresence>
@@ -405,6 +422,7 @@ export function DayBox({ date, dateStr, entries, customCategories, allEntries, r
           </Button>
         </div>
       )}
+      </div>
     </motion.div>
   );
 }
