@@ -765,7 +765,7 @@ export async function loadLearnedPatternsFromCloud(): Promise<LearnedPattern[]> 
       .eq('vault_id', vid)
       .maybeSingle();
     if (!error && data?.patterns) {
-      const cloud = data.patterns as LearnedPattern[];
+      const cloud = data.patterns as unknown as LearnedPattern[];
       // Merge with any local-only patterns not yet synced
       const local = loadLocalPatterns();
       const merged = mergePatterns(cloud, local);
@@ -784,7 +784,7 @@ export async function saveLearnedPatternsToCloud(patterns: LearnedPattern[]): Pr
   if (!vid) return;
   const { error } = await supabase
     .from('refund_learned_patterns')
-    .upsert({ vault_id: vid, patterns, updated_at: new Date().toISOString() }, { onConflict: 'vault_id' });
+    .upsert({ vault_id: vid, patterns: patterns as unknown as never, updated_at: new Date().toISOString() } as never, { onConflict: 'vault_id' });
   if (error) console.error('saveLearnedPatternsToCloud', error);
 }
 
