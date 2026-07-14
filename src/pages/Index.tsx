@@ -44,16 +44,12 @@ const Index = () => {
     <RefundMatcher data={data} onDataChange={refreshData} />
     <div className="min-h-screen mcm-bg relative overflow-x-hidden">
 
-      {/* Memphis geometric accent shapes — bold, sparse, editorial */}
-      {/* Top-left: bold yellow rectangle block */}
-      <div className="mcm-blob top-0 left-0 w-2 h-screen bg-[hsl(var(--memphis-yellow,45_95%_55%))] opacity-60" style={{ width: '6px' }} />
-      {/* Top-right accent dot cluster */}
-      <div className="mcm-blob top-6 right-6 w-16 h-16 rounded-full border-4 border-[hsl(var(--accent))] opacity-30" />
-      <div className="mcm-blob top-12 right-16 w-6 h-6 rounded-full bg-[hsl(var(--primary))] opacity-20" />
-      {/* Bottom-left triangle */}
-      <div className="mcm-blob bottom-16 left-8 w-0 h-0 border-l-[20px] border-l-transparent border-r-[20px] border-r-transparent border-b-[36px] border-b-[hsl(var(--accent))] opacity-20" />
-      {/* Mid-right rectangle */}
-      <div className="mcm-blob top-[40%] -right-2 w-8 h-24 bg-[hsl(var(--primary))] opacity-15 rounded-l-lg" />
+      {/* Memphis geometric accent shapes — hidden on mobile to keep UI clean */}
+      <div className="hidden sm:block mcm-blob top-0 left-0 h-screen bg-[hsl(var(--memphis-yellow,45_95%_55%))] opacity-60" style={{ width: '6px' }} />
+      <div className="hidden sm:block mcm-blob top-6 right-6 w-16 h-16 rounded-full border-4 border-[hsl(var(--accent))] opacity-30" />
+      <div className="hidden sm:block mcm-blob top-12 right-16 w-6 h-6 rounded-full bg-[hsl(var(--primary))] opacity-20" />
+      <div className="hidden sm:block mcm-blob bottom-16 left-8 w-0 h-0 border-l-[20px] border-l-transparent border-r-[20px] border-r-transparent border-b-[36px] border-b-[hsl(var(--accent))] opacity-20" />
+      <div className="hidden sm:block mcm-blob top-[40%] -right-2 w-8 h-24 bg-[hsl(var(--primary))] opacity-15 rounded-l-lg" />
 
       {/* Header */}
       <header className="border-b-2 border-border bg-white/95 backdrop-blur-sm sticky top-0 z-50" style={{ boxShadow: '0 2px 0 hsl(var(--border)), 0 4px 20px -8px hsl(230 25% 12% / 0.10)' }}>
