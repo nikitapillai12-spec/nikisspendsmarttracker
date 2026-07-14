@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Wallet, BarChart3, Settings, CloudUpload, RefreshCw, Database } from 'lucide-react';
 import { WeeklyView } from '@/components/WeeklyView';
 import { MonthlyOverview } from '@/components/MonthlyOverview';
-import { AutoUnlock } from '@/components/AutoUnlock';
+import { PasscodeGate } from '@/components/PasscodeGate';
 import { BudgetData } from '@/lib/budget-types';
 import { getAll, subscribeStore, initStore, migrateLocalDataIfAny, maybeRunDailyBackup } from '@/lib/budget-store';
 import { getStoredVaultId } from '@/lib/vault-store';
@@ -40,7 +40,7 @@ const Index = () => {
   const refreshData = (newData: BudgetData) => setData({ ...newData });
 
   return (
-    <AutoUnlock>
+    <PasscodeGate>
     <RefundMatcher data={data} onDataChange={refreshData} />
     <div className="min-h-screen mcm-bg relative overflow-x-hidden">
 
@@ -161,7 +161,7 @@ const Index = () => {
         )}
       </main>
     </div>
-    </AutoUnlock>
+    </PasscodeGate>
   );
 };
 
