@@ -40,7 +40,7 @@ const Index = () => {
   const refreshData = (newData: BudgetData) => setData({ ...newData });
 
   return (
-    <AutoUnlock>
+    <PasscodeGate>
     <RefundMatcher data={data} onDataChange={refreshData} />
     <div className="min-h-screen mcm-bg relative overflow-x-hidden">
 
@@ -161,7 +161,7 @@ const Index = () => {
         )}
       </main>
     </div>
-    </AutoUnlock>
+    </PasscodeGate>
   );
 };
 
