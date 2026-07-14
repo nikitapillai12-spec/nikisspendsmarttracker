@@ -389,8 +389,8 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
         </div>
       )}
 
-      <div className="overflow-x-auto -mx-2 px-2 pb-2">
-      <div className="grid grid-cols-7 gap-3" style={{ minWidth: '560px' }}>
+      <div className="pb-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3">
         {days.map((day, i) => {
           const dateStr = formatDate(day);
           const dayEntries = data.entries.filter(e => e.date === dateStr);
