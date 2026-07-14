@@ -2,6 +2,32 @@ import { supabase } from '@/integrations/supabase/client';
 
 const VAULT_ID_KEY = 'spendsmart_vault_id';
 
+// Patch global fetch once so every Supabase REST/RPC request carries the
+// current vault id. supabase-js does not expose a supported way to mutate
+// headers after createClient(), so injecting at the fetch layer is the
+// reliable path. Realtime uses WebSockets and is not affected.
+let fetchPatched = false;
+function ensureFetchPatched() {
+  if (fetchPatched) return;
+  fetchPatched = true;
+  const orig = globalThis.fetch.bind(globalThis);
+  globalThis.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
+    try {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url;
+      if (url && url.includes('.supabase.co/')) {
+        const id = localStorage.getItem(VAULT_ID_KEY);
+        if (id) {
+          const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
+          headers.set('x-vault-id', id);
+          return orig(input, { ...(init ?? {}), headers });
+        }
+      }
+    } catch { /* fall through */ }
+    return orig(input, init);
+  };
+}
+ensureFetchPatched();
+
 async function hashPasscode(passcode: string): Promise<string> {
   const data = new TextEncoder().encode(passcode);
   const buf = await crypto.subtle.digest('SHA-256', data);
@@ -10,26 +36,9 @@ async function hashPasscode(passcode: string): Promise<string> {
     .join('');
 }
 
-// Attach the current vault id as a request header so RLS policies can scope
-// data access to just this vault. Called whenever the stored id changes.
-function applyVaultHeader(id: string | null) {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const rest = (supabase as any).rest;
-    if (rest && rest.headers) {
-      if (id) rest.headers['x-vault-id'] = id;
-      else delete rest.headers['x-vault-id'];
-    }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const headers = (supabase as any).headers;
-    if (headers) {
-      if (id) headers['x-vault-id'] = id;
-      else delete headers['x-vault-id'];
-    }
-  } catch (e) {
-    console.warn('applyVaultHeader failed', e);
-  }
-}
+// Header injection is handled by the fetch patch above; these helpers are
+// no-ops kept for API compatibility.
+function applyVaultHeader(_id: string | null) { /* handled by fetch patch */ }
 
 export function getStoredVaultId(): string | null {
   const id = localStorage.getItem(VAULT_ID_KEY);
