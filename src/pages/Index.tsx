@@ -66,7 +66,7 @@ const Index = () => {
                 </div>
               </div>
               <div className="min-w-0">
-                <h1 className="font-display leading-none tracking-tight text-xl sm:text-3xl" style={{ fontWeight: 900, letterSpacing: '-0.02em' }}>
+                <h1 className="font-display leading-none tracking-tight text-lg sm:text-3xl truncate" style={{ fontWeight: 900, letterSpacing: '-0.02em' }}>
                   SpendSmart
                 </h1>
                 <p className="text-[10px] sm:text-xs text-muted-foreground font-body mt-0.5 tracking-wide hidden sm:block">Stay on top of what you spend on</p>
@@ -115,25 +115,27 @@ const Index = () => {
               <div className="flex rounded-lg bg-secondary p-0.5 gap-0.5 border-2 border-border mcm-shadow-sm">
                 <button
                   onClick={() => setTab('weekly')}
-                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs sm:text-sm font-semibold tracking-wide transition-all ${
+                  aria-label="Weekly view"
+                  className={`flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-md text-xs sm:text-sm font-semibold tracking-wide transition-all ${
                     tab === 'weekly'
                       ? 'bg-[hsl(var(--primary))] text-white shadow-sm'
                       : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   <Wallet className="w-3.5 h-3.5" />
-                  <span>Weekly</span>
+                  <span className="hidden sm:inline">Weekly</span>
                 </button>
                 <button
                   onClick={() => setTab('timeseries')}
-                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs sm:text-sm font-semibold tracking-wide transition-all ${
+                  aria-label="Charts view"
+                  className={`flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-md text-xs sm:text-sm font-semibold tracking-wide transition-all ${
                     tab === 'timeseries'
                       ? 'bg-[hsl(var(--accent))] text-white shadow-sm'
                       : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   <BarChart3 className="w-3.5 h-3.5" />
-                  <span>Charts</span>
+                  <span className="hidden sm:inline">Charts</span>
                 </button>
               </div>
             </div>
