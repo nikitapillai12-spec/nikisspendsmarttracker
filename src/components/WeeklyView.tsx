@@ -1,17 +1,14 @@
 import { useState, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Target, Tag } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { DayBox } from './DayBox';
 import { CategoryManager } from './CategoryManager';
 import { RecurringPaymentsManager } from './RecurringPaymentsManager';
-import { InvestmentsManager } from './InvestmentsManager';
 import { BudgetRings } from './BudgetRings';
 import { BudgetData, Category, SpendEntry, EntryType, RecurringPayment, getAllCategories, getCategoryEmoji, getCategoryColor, getRecurringForMonth, signedAmount, shouldDistributeWeekly } from '@/lib/budget-types';
 import { getWeekStart, getWeekEnd, getWeekDays, formatDate, formatMonth, formatDisplayMonth, navigateWeek, getWeeklyBudget, weeksTouchingMonth, recurringDisplayDateInWeek, getWeekRepresentativeDatesForMonth } from '@/lib/date-utils';
 import { addEntry, updateEntry, deleteEntry, getMonthlyBudget, setMonthlyBudget, setCategoryBudget, deleteCategoryBudget, getEffectiveCategoryBudget, setAnnualBudget, getAnnualBudget } from '@/lib/budget-store';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 interface WeeklyViewProps {
   data: BudgetData;
@@ -20,11 +17,6 @@ interface WeeklyViewProps {
 
 export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
   const [weekStart, setWeekStart] = useState(() => getWeekStart(new Date()));
-  const [budgetInput, setBudgetInput] = useState('');
-  const [budgetDialogOpen, setBudgetDialogOpen] = useState(false);
-  const [catBudgetInputs, setCatBudgetInputs] = useState<Record<string, string>>({});
-  const [budgetMode, setBudgetMode] = useState<'total' | 'categories'>('total');
-  const [vacationsInput, setVacationsInput] = useState('');
 
   const weekEnd = getWeekEnd(weekStart);
   const days = getWeekDays(weekStart);
@@ -139,74 +131,6 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
   const handleDelete = useCallback((id: string) => {
     onDataChange(deleteEntry(id));
   }, [onDataChange]);
-
-  const openBudgetDialog = () => {
-    setBudgetInput(currentBudget?.toString() || '');
-    const init: Record<string, string> = {};
-    let hasAnyCat = false;
-    allCats.forEach(c => {
-      const v = getEffectiveCategoryBudget(data, c, month);
-      if (v !== null) hasAnyCat = true;
-      init[c] = v !== null ? v.toString() : '';
-    });
-    setCatBudgetInputs(init);
-    setBudgetMode(hasAnyCat && !currentBudget ? 'categories' : 'total');
-    const year = new Date(weekStart).getFullYear();
-    const vab = getAnnualBudget(year, 'Vacations');
-    setVacationsInput(vab ? vab.amount.toString() : '');
-    setBudgetDialogOpen(true);
-  };
-
-  const handleSetBudget = () => {
-    let latest = data;
-    if (budgetMode === 'total') {
-      const val = parseFloat(budgetInput);
-      if (!Number.isNaN(val) && val > 0) {
-        latest = setMonthlyBudget(month, val);
-      }
-      (latest.categoryBudgets || [])
-        .filter(b => b.month === month)
-        .forEach(b => { latest = deleteCategoryBudget(b.category, month); });
-    } else {
-      let sum = 0;
-      Object.entries(catBudgetInputs).forEach(([cat, raw]) => {
-        const trimmed = raw.trim();
-        if (trimmed === '') {
-          const hasAtThisMonth = (latest.categoryBudgets || []).some(b => b.category === cat && b.month === month);
-          if (hasAtThisMonth) latest = deleteCategoryBudget(cat, month);
-          return;
-        }
-        const n = parseFloat(trimmed);
-        if (!Number.isNaN(n) && n >= 0) {
-          latest = setCategoryBudget(cat, month, n);
-          sum += n;
-        }
-      });
-      if (sum > 0) {
-        latest = setMonthlyBudget(month, sum);
-      }
-    }
-    // Save vacations annual budget
-    const year = new Date(weekStart).getFullYear();
-    const vacVal = parseFloat(vacationsInput);
-    if (!isNaN(vacVal) && vacVal > 0) {
-      latest = setAnnualBudget({ year, label: 'Vacations', amount: vacVal, categories: ['Flights', 'Travel Spend'] });
-    }
-
-    onDataChange(latest);
-    setBudgetDialogOpen(false);
-    setBudgetInput('');
-    setCatBudgetInputs({});
-  };
-
-  const updateCatBudget = (cat: string, val: string) => {
-    setCatBudgetInputs(prev => ({ ...prev, [cat]: val }));
-  };
-
-  const totalCategoryBudgets = Object.values(catBudgetInputs).reduce((s, v) => {
-    const n = parseFloat(v);
-    return Number.isNaN(n) ? s : s + n;
-  }, 0);
 
   return (
     <div className="space-y-6">
