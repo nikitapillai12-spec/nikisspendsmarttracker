@@ -7,7 +7,7 @@ import { RecurringPaymentsManager } from './RecurringPaymentsManager';
 import { BudgetRings } from './BudgetRings';
 import { BudgetData, Category, SpendEntry, EntryType, RecurringPayment, getAllCategories, getCategoryEmoji, getCategoryColor, getRecurringForMonth, signedAmount, shouldDistributeWeekly } from '@/lib/budget-types';
 import { getWeekStart, getWeekEnd, getWeekDays, formatDate, formatMonth, formatDisplayMonth, navigateWeek, getWeeklyBudget, weeksTouchingMonth, recurringDisplayDateInWeek, getWeekRepresentativeDatesForMonth } from '@/lib/date-utils';
-import { addEntry, updateEntry, deleteEntry, getMonthlyBudget, setMonthlyBudget, setCategoryBudget, deleteCategoryBudget, getEffectiveCategoryBudget, setAnnualBudget, getAnnualBudget } from '@/lib/budget-store';
+import { addEntry, updateEntry, deleteEntry, getMonthlyBudget } from '@/lib/budget-store';
 import { Button } from '@/components/ui/button';
 
 interface WeeklyViewProps {
