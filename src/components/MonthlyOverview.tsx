@@ -272,7 +272,13 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
     );
   }
 
-  const activeCategories = allCats.filter(c => stackedData.some(d => (d as any)[c] > 0));
+  const stackedRows = filterRange(stackedData, rangeCategory);
+  const totalSpendRows = filterRange(totalSpendData, rangeTotal);
+  const fourBarRows = filterRange(fourBarData, rangeBreakdown);
+  const budgetRows = filterRange(budgetChartData, rangeBudget);
+  const investmentRows = filterRange(investmentData, rangeInvest);
+
+  const activeCategories = allCats.filter(c => stackedRows.some(d => (d as any)[c] > 0));
 
   const BudgetTooltip = ({ active, payload }: any) => {
     if (!active || !payload || !payload.length) return null;
