@@ -777,3 +777,105 @@ function mergePatterns(a: LearnedPattern[], b: LearnedPattern[]): LearnedPattern
   }
   return result;
 }
+
+// ---------- Budget plan (Setup page) ----------
+
+/** Creates or updates the single budget plan for this vault. */
+export async function saveBudgetPlan(plan: Omit<BudgetPlan, 'id'> & { id?: string }): Promise<BudgetData> {
+  const vid = vaultId();
+  const row = {
+    vault_id: vid,
+    start_date: plan.startDate,
+    end_date: plan.endDate,
+    categories: plan.categories as never,
+    locked: plan.locked,
+  };
+  if (plan.id) {
+    cache.budgetPlan = { ...plan, id: plan.id } as BudgetPlan;
+    notify();
+    const { error } = await supabase.from('budget_plans').update(row).eq('id', plan.id).eq('vault_id', vid);
+    if (error) console.error('saveBudgetPlan update', error);
+  } else {
+    const { data, error } = await supabase.from('budget_plans').insert(row).select().maybeSingle();
+    if (error) console.error('saveBudgetPlan insert', error);
+    if (data) cache.budgetPlan = mapPlan(data);
+    notify();
+  }
+  return cache;
+}
+
+export async function deleteBudgetPlan(id: string): Promise<BudgetData> {
+  cache.budgetPlan = null;
+  notify();
+  const { error } = await supabase.from('budget_plans').delete().eq('id', id).eq('vault_id', vaultId());
+  if (error) console.error('deleteBudgetPlan', error);
+  return cache;
+}
+
+/** True if the plan is locked and the given YYYY-MM-DD date falls inside its range. */
+export function isPlanActiveOn(plan: BudgetPlan | null | undefined, date: string): boolean {
+  if (!plan || !plan.locked) return false;
+  return date >= plan.startDate && date <= plan.endDate;
+}
+
+/** Monthly budget for a category from the locked plan, for a given YYYY-MM month. */
+export function getPlanCategoryBudget(data: BudgetData, category: string, month: string): number | null {
+  const plan = data.budgetPlan;
+  if (!plan || !plan.locked) return null;
+  if (month < plan.startDate.slice(0, 7) || month > plan.endDate.slice(0, 7)) return null;
+  const v = plan.categories?.[category];
+  return typeof v === 'number' && v > 0 ? v : null;
+}
+
+/** Total monthly budget from the locked plan for a given month, or null. */
+export function getPlanMonthlyTotal(data: BudgetData, month: string): number | null {
+  const plan = data.budgetPlan;
+  if (!plan || !plan.locked) return null;
+  if (month < plan.startDate.slice(0, 7) || month > plan.endDate.slice(0, 7)) return null;
+  const total = Object.values(plan.categories || {}).reduce((s, v) => s + (Number(v) || 0), 0);
+  return total > 0 ? total : null;
+}
+
+// ---------- Recurring investments ----------
+export function addRecurringInvestment(r: RecurringInvestment): BudgetData {
+  cache.recurringInvestments = [...(cache.recurringInvestments || []), r];
+  notify();
+  supabase.from('recurring_investments').insert({
+    id: r.id,
+    vault_id: vaultId(),
+    amount: r.amount,
+    platform: r.platform,
+    start_date: r.startDate,
+    end_date: r.endDate ?? null,
+    frequency: r.frequency,
+    day_of_week: r.dayOfWeek ?? null,
+    note: r.note ?? null,
+    active: r.active,
+  }).then(({ error }) => { if (error) console.error('addRecurringInvestment sync', error); });
+  return cache;
+}
+
+export function deleteRecurringInvestment(id: string): BudgetData {
+  cache.recurringInvestments = (cache.recurringInvestments || []).filter(r => r.id !== id);
+  notify();
+  supabase.from('recurring_investments').delete().eq('id', id)
+    .then(({ error }) => { if (error) console.error('deleteRecurringInvestment sync', error); });
+  return cache;
+}
+
+export function updateRecurringInvestment(id: string, updates: Partial<Omit<RecurringInvestment, 'id'>>): BudgetData {
+  cache.recurringInvestments = (cache.recurringInvestments || []).map(r => r.id === id ? { ...r, ...updates } : r);
+  notify();
+  const patch: Record<string, unknown> = {};
+  if (updates.amount !== undefined) patch.amount = updates.amount;
+  if (updates.platform !== undefined) patch.platform = updates.platform;
+  if (updates.startDate !== undefined) patch.start_date = updates.startDate;
+  if (updates.endDate !== undefined) patch.end_date = updates.endDate ?? null;
+  if (updates.frequency !== undefined) patch.frequency = updates.frequency;
+  if (updates.dayOfWeek !== undefined) patch.day_of_week = updates.dayOfWeek ?? null;
+  if (updates.note !== undefined) patch.note = updates.note ?? null;
+  if (updates.active !== undefined) patch.active = updates.active;
+  supabase.from('recurring_investments').update(patch).eq('id', id)
+    .then(({ error }) => { if (error) console.error('updateRecurringInvestment sync', error); });
+  return cache;
+}
