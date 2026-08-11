@@ -407,7 +407,67 @@ export function DayBox({ date, dateStr, entries, customCategories, allEntries, r
                 </Select>
               )}
               {addMode === 'investment' && (
-                <div className="text-xs text-muted-foreground px-1">Investment spend — tracked separately from budget</div>
+                <div className="space-y-2">
+                  <div className="text-xs text-muted-foreground px-1">Investment — tracked separately from budget</div>
+                  <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer px-1">
+                    <input
+                      type="checkbox"
+                      checked={isRecurringInvestment}
+                      onChange={(e) => setIsRecurringInvestment(e.target.checked)}
+                      className="h-4 w-4 accent-blue-600"
+                    />
+                    Make this a recurring investment
+                  </label>
+                  {isRecurringInvestment && (
+                    <div className="rounded-lg border border-dashed border-blue-400/60 bg-blue-50/40 p-2 space-y-2">
+                      <div>
+                        <label className="text-[11px] text-muted-foreground">Platform</label>
+                        <Select value={riPlatform} onValueChange={setRiPlatform}>
+                          <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {(investmentPlatforms.length ? investmentPlatforms : ['T212 ISA']).map(p => (
+                              <SelectItem key={p} value={p} className="text-sm">{p}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[11px] text-muted-foreground">Start date</label>
+                          <Input type="date" value={riStart} onChange={e => setRiStart(e.target.value)} className="h-8 text-sm" />
+                        </div>
+                        <div>
+                          <label className="text-[11px] text-muted-foreground">End date</label>
+                          <Input type="date" value={riEnd} onChange={e => setRiEnd(e.target.value)} className="h-8 text-sm" />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-[11px] text-muted-foreground">Frequency</label>
+                        <Select value={riFreq} onValueChange={(v) => setRiFreq(v as 'weekly' | 'fortnightly' | 'monthly')}>
+                          <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="weekly" className="text-sm">Weekly</SelectItem>
+                            <SelectItem value="fortnightly" className="text-sm">Fortnightly</SelectItem>
+                            <SelectItem value="monthly" className="text-sm">Monthly</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {riFreq !== 'monthly' && (
+                        <div>
+                          <label className="text-[11px] text-muted-foreground">Day of the week</label>
+                          <Select value={String(riDow)} onValueChange={(v) => setRiDow(Number(v))}>
+                            <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((d, i) => (
+                                <SelectItem key={d} value={String(i)} className="text-sm">{d}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               )}
               <RetailerInput
                 value={note}
