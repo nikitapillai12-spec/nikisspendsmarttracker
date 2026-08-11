@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Wallet, BarChart3, Settings, CloudUpload, RefreshCw, Database } from 'lucide-react';
+import { Wallet, BarChart3, Settings, CloudUpload, RefreshCw, Database, SlidersHorizontal } from 'lucide-react';
 import { WeeklyView } from '@/components/WeeklyView';
 import { MonthlyOverview } from '@/components/MonthlyOverview';
+import { SetupView } from '@/components/SetupView';
 import { PasscodeGate } from '@/components/PasscodeGate';
 import { BudgetData } from '@/lib/budget-types';
 import { getAll, subscribeStore, initStore, migrateLocalDataIfAny, maybeRunDailyBackup } from '@/lib/budget-store';
@@ -19,7 +20,7 @@ import { PdfImport } from '@/components/PdfImport';
 import { RefundMatcher } from '@/components/RefundMatcher';
 import { FileText } from 'lucide-react';
 
-type Tab = 'weekly' | 'timeseries';
+type Tab = 'weekly' | 'timeseries' | 'setup';
 
 const Index = () => {
   const [tab, setTab] = useState<Tab>('weekly');
@@ -137,6 +138,18 @@ const Index = () => {
                   <BarChart3 className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">Charts</span>
                 </button>
+                <button
+                  onClick={() => setTab('setup')}
+                  aria-label="Set up view"
+                  className={`flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-md text-xs sm:text-sm font-semibold tracking-wide transition-all ${
+                    tab === 'setup'
+                      ? 'bg-[hsl(var(--mcm-mustard,42_75%_50%))] text-white shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <SlidersHorizontal className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Set Up</span>
+                </button>
               </div>
             </div>
           </div>
@@ -150,7 +163,11 @@ const Index = () => {
 
       {/* Content */}
       <main className="container max-w-7xl mx-auto px-2 sm:px-4 py-4 sm:py-6 relative z-10">
-        {tab === 'weekly' ? (
+        {tab === 'setup' ? (
+          <div key="setup">
+            <SetupView data={data} onDataChange={refreshData} />
+          </div>
+        ) : tab === 'weekly' ? (
           <div key="weekly">
             <WeeklyView data={data} onDataChange={refreshData} />
           </div>

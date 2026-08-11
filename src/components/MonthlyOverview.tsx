@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { TrendingUp, TrendingDown, X } from 'lucide-react';
 import { BudgetData, getAllCategories, getCategoryColor, getCategoryEmoji, signedAmount } from '@/lib/budget-types';
 import { getMonthsInRange } from '@/lib/date-utils';
-import { getEffectiveMonthlyBudget, getEffectiveCategoryBudget } from '@/lib/budget-store';
+import { getEffectiveMonthlyBudget, getEffectiveCategoryBudget, getPlanMonthlyTotal, getPlanCategoryBudget } from '@/lib/budget-store';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   Line, ComposedChart, Cell, Area, LabelList, ReferenceLine,
@@ -13,6 +13,50 @@ import { Button } from '@/components/ui/button';
 
 interface MonthlyOverviewProps {
   data: BudgetData;
+}
+
+type RangeKey = 'ytd' | '1y' | '2y' | '3y' | 'all';
+
+const RANGE_LABELS: { key: RangeKey; label: string }[] = [
+  { key: 'ytd', label: 'YTD' },
+  { key: '1y', label: '1Y' },
+  { key: '2y', label: '2Y' },
+  { key: '3y', label: '3Y' },
+  { key: 'all', label: 'All' },
+];
+
+/** Earliest YYYY-MM month included for a range, or null for "all". */
+function rangeCutoff(range: RangeKey): string | null {
+  const now = new Date();
+  if (range === 'all') return null;
+  if (range === 'ytd') return `${now.getFullYear()}-01`;
+  const years = range === '1y' ? 1 : range === '2y' ? 2 : 3;
+  const d = new Date(now.getFullYear() - years, now.getMonth(), 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function RangeToggle({ value, onChange }: { value: RangeKey; onChange: (r: RangeKey) => void }) {
+  return (
+    <div className="flex rounded-full bg-secondary p-0.5 gap-0.5 border border-border shrink-0">
+      {RANGE_LABELS.map(r => (
+        <button
+          key={r.key}
+          type="button"
+          onClick={() => onChange(r.key)}
+          className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-colors ${
+            value === r.key ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          {r.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function filterRange<T extends { monthKey: string }>(rows: T[], range: RangeKey): T[] {
+  const cutoff = rangeCutoff(range);
+  return cutoff ? rows.filter(r => r.monthKey >= cutoff) : rows;
 }
 
 interface CategoryInsight {
@@ -76,10 +120,21 @@ function generateSuggestions(insight: MonthInsight, prevInsight: MonthInsight | 
 }
 
 export function MonthlyOverview({ data }: MonthlyOverviewProps) {
-  const months = useMemo(() => getMonthsInRange(data.entries), [data.entries]);
+  const months = useMemo(
+    () => getMonthsInRange([
+      ...data.entries,
+      ...(data.investmentEntries || []).map(e => ({ date: e.date })),
+    ]),
+    [data.entries, data.investmentEntries],
+  );
   const customCats = data.customCategories || [];
   const allCats = getAllCategories(customCats);
   const [drillMonth, setDrillMonth] = useState<string | null>(null);
+  const [rangeTotal, setRangeTotal] = useState<RangeKey>('all');
+  const [rangeCategory, setRangeCategory] = useState<RangeKey>('all');
+  const [rangeBreakdown, setRangeBreakdown] = useState<RangeKey>('all');
+  const [rangeBudget, setRangeBudget] = useState<RangeKey>('all');
+  const [rangeInvest, setRangeInvest] = useState<RangeKey>('all');
 
   const monthlyData: MonthInsight[] = useMemo(() => {
     return months.map((month, idx) => {
@@ -94,16 +149,18 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
 
       const totalSpend = spendOnly.reduce((s, e) => s + e.amount, 0);
       const totalCredits = creditOnly.reduce((s, e) => s + e.amount, 0);
-      const totalInvestments = investOnly.reduce((s, e) => s + e.amount, 0);
+      const totalInvestments =
+        investOnly.reduce((s, e) => s + e.amount, 0) +
+        (data.investmentEntries || []).filter(e => e.date.startsWith(month)).reduce((s, e) => s + e.amount, 0);
       const netSpend = totalSpend - totalCredits;
       const total = entries.reduce((s, e) => s + signedAmount(e), 0);
-      const budget = getEffectiveMonthlyBudget(data, month);
+      const budget = getPlanMonthlyTotal(data, month) ?? getEffectiveMonthlyBudget(data, month);
       const displayMonth = format(new Date(month + '-01'), 'MMM yy');
 
       const categoryInsights: CategoryInsight[] = allCats
         .map(cat => {
           const spent = byCategory[cat] || 0;
-          const catBudget = getEffectiveCategoryBudget(data, cat, month);
+          const catBudget = getPlanCategoryBudget(data, cat, month) ?? getEffectiveCategoryBudget(data, cat, month);
           return { category: cat, spent, budget: catBudget, diff: catBudget !== null ? catBudget - spent : null };
         })
         .filter(ci => ci.spent > 0 || ci.budget !== null);
@@ -141,10 +198,33 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
       displayMonth: d.displayMonth,
       monthKey: d.month,
       netSpend: d.netSpend,
+      totalSpend: d.totalSpend,
       total: d.total,
       ...d.byCategory,
     }));
   }, [monthlyData]);
+
+  // Chart 0 — total spend per month (spend minus credits), no breakdown
+  const totalSpendData = useMemo(
+    () => monthlyData.map(d => ({
+      month: d.displayMonth,
+      monthKey: d.month,
+      netSpend: d.netSpend,
+      totalSpend: d.totalSpend,
+      totalCredits: d.totalCredits,
+    })),
+    [monthlyData],
+  );
+
+  // Investments per month (entries tagged as investment + investment top-ups)
+  const investmentData = useMemo(
+    () => monthlyData.map(d => ({
+      month: d.displayMonth,
+      monthKey: d.month,
+      invested: d.totalInvestments,
+    })),
+    [monthlyData],
+  );
 
   // Four-bar chart data (Item 4 Chart 2)
   const fourBarData = useMemo(() => {
@@ -162,10 +242,10 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
     return monthlyData.filter(d => d.budget !== null).map(d => ({
       month: d.displayMonth,
       monthKey: d.month,
-      spent: d.total,
+      spent: d.netSpend,
       budget: d.budget as number,
-      diff: d.diff as number,
-      isOver: (d.diff as number) < 0,
+      diff: (d.budget as number) - d.netSpend,
+      isOver: (d.budget as number) - d.netSpend < 0,
     }));
   }, [monthlyData]);
 
@@ -192,7 +272,13 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
     );
   }
 
-  const activeCategories = allCats.filter(c => stackedData.some(d => (d as any)[c] > 0));
+  const stackedRows = filterRange(stackedData, rangeCategory);
+  const totalSpendRows = filterRange(totalSpendData, rangeTotal);
+  const fourBarRows = filterRange(fourBarData, rangeBreakdown);
+  const budgetRows = filterRange(budgetChartData, rangeBudget);
+  const investmentRows = filterRange(investmentData, rangeInvest);
+
+  const activeCategories = allCats.filter(c => stackedRows.some(d => (d as any)[c] > 0));
 
   const BudgetTooltip = ({ active, payload }: any) => {
     if (!active || !payload || !payload.length) return null;
@@ -325,15 +411,49 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
         </motion.div>
       )}
 
-      {/* CHART 1 — Monthly Net Spend Stacked Bar by Category */}
+      {/* CHART 0 — Total Spend per Month (spend minus credits) */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+        className="bg-card rounded-2xl border border-border p-6 mcm-shadow">
+        <div className="flex items-start justify-between gap-3 flex-wrap mb-4">
+          <div>
+            <h3 className="font-display font-bold text-lg mb-1">Total Spend per Month</h3>
+            <p className="text-sm text-muted-foreground">Total spend in the month, less all credits received that month.</p>
+          </div>
+          <RangeToggle value={rangeTotal} onChange={setRangeTotal} />
+        </div>
+        <div className="overflow-x-auto -mx-2"><div className="h-72" style={{ minWidth: 320 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={totalSpendRows} barCategoryGap="20%">
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <XAxis dataKey="month" tick={{ fontSize: 13 }} />
+              <YAxis tick={{ fontSize: 13 }} tickFormatter={(v) => `£${v}`} />
+              <Tooltip
+                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', fontSize: '13px' }}
+                formatter={(v: number) => [`£${v.toFixed(2)}`, 'Total spend']}
+              />
+              <Bar dataKey="netSpend" name="Total spend" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} maxBarSize={90}>
+                <LabelList dataKey="netSpend" position="top" formatter={(v: number) => `£${v.toFixed(0)}`}
+                  style={{ fontSize: '11px', fontWeight: 700, fill: 'hsl(var(--foreground))' }} />
+              </Bar>
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div></div>
+      </motion.div>
+
+      {/* CHART 1 — Monthly Spend by Category */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
         className="bg-card rounded-2xl border border-border p-6 mcm-shadow">
-        <h3 className="font-display font-bold text-lg mb-1">Monthly Net Spend by Category</h3>
-        <p className="text-sm text-muted-foreground mb-4">Stacked by category. Hover for breakdown + suggestions.</p>
-        {stackedData.length > 0 && (
+        <div className="flex items-start justify-between gap-3 flex-wrap mb-4">
+          <div>
+            <h3 className="font-display font-bold text-lg mb-1">Monthly Spend by Category</h3>
+            <p className="text-sm text-muted-foreground">Sum of spend per category each month. Hover for breakdown + suggestions.</p>
+          </div>
+          <RangeToggle value={rangeCategory} onChange={setRangeCategory} />
+        </div>
+        {stackedRows.length > 0 && (
           <div className="overflow-x-auto -mx-2"><div className="h-80" style={{minWidth:320}}>
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={stackedData} barCategoryGap="20%">
+              <ComposedChart data={stackedRows} barCategoryGap="20%">
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis dataKey="displayMonth" tick={{ fontSize: 13 }} />
                 <YAxis tick={{ fontSize: 13 }} tickFormatter={(v) => `£${v}`} />
@@ -344,7 +464,7 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
                     radius={cat === activeCategories[activeCategories.length - 1] ? [4, 4, 0, 0] : [0, 0, 0, 0]}>
                     {cat === activeCategories[activeCategories.length - 1] && (
                       <LabelList
-                        dataKey="netSpend"
+                        dataKey="totalSpend"
                         position="top"
                         formatter={(v: number) => `£${v.toFixed(0)}`}
                         style={{ fontSize: '11px', fontWeight: 700, fill: 'hsl(var(--foreground))' }}
@@ -352,8 +472,8 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
                     )}
                   </Bar>
                 ))}
-                <Line type="monotone" dataKey="netSpend" stroke="hsl(var(--foreground))" strokeWidth={2.5}
-                  dot={{ r: 5, fill: 'hsl(var(--foreground))' }} name="Net Spend trend" />
+                <Line type="monotone" dataKey="totalSpend" stroke="hsl(var(--foreground))" strokeWidth={2.5}
+                  dot={{ r: 5, fill: 'hsl(var(--foreground))' }} name="Spend trend" />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
@@ -364,12 +484,17 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
       {/* CHART 2 — Four-Bar Monthly Breakdown with Trendline */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
         className="bg-card rounded-2xl border border-border p-6 mcm-shadow">
-        <h3 className="font-display font-bold text-lg mb-1">Monthly Breakdown — Spend / Credits / Net / Investments</h3>
-        <p className="text-sm text-muted-foreground mb-4">Click any bar or label to drill into that month.</p>
-        {fourBarData.length > 0 && (
+        <div className="flex items-start justify-between gap-3 flex-wrap mb-4">
+          <div>
+            <h3 className="font-display font-bold text-lg mb-1">Monthly Breakdown — Spend / Credits / Net / Investments</h3>
+            <p className="text-sm text-muted-foreground">Click any bar or label to drill into that month.</p>
+          </div>
+          <RangeToggle value={rangeBreakdown} onChange={setRangeBreakdown} />
+        </div>
+        {fourBarRows.length > 0 && (
           <div className="overflow-x-auto -mx-2"><div className="h-80" style={{minWidth:320}}>
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={fourBarData} barCategoryGap="15%">
+              <ComposedChart data={fourBarRows} barCategoryGap="15%">
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis dataKey="month" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `£${v}`} />
@@ -461,18 +586,23 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
       {budgetChartData.length > 0 && (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
           className="bg-card rounded-2xl border border-border p-6 mcm-shadow">
-          <h3 className="font-display font-bold text-lg mb-1">Actual Spend vs Monthly Budget</h3>
-          <p className="text-sm text-muted-foreground mb-4">Bars show actual spend, dashed line = budget, solid line = trend. Hover for insights + suggestions.</p>
+          <div className="flex items-start justify-between gap-3 flex-wrap mb-4">
+            <div>
+              <h3 className="font-display font-bold text-lg mb-1">Actual Spend vs Monthly Budget</h3>
+              <p className="text-sm text-muted-foreground">Bars show actual spend against your locked-in monthly budget (dashed line).</p>
+            </div>
+            <RangeToggle value={rangeBudget} onChange={setRangeBudget} />
+          </div>
           <div className="overflow-x-auto -mx-2"><div className="h-80" style={{minWidth:320}}>
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={budgetChartData}>
+              <ComposedChart data={budgetRows}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis dataKey="month" tick={{ fontSize: 13 }} />
                 <YAxis tick={{ fontSize: 13 }} tickFormatter={(v) => `£${v}`} />
                 <Tooltip content={<BudgetTooltip />} cursor={{ fill: 'hsl(var(--accent) / 0.08)' }} />
                 <Legend wrapperStyle={{ fontSize: '13px' }} />
                 <Bar dataKey="spent" name="Actual spend" radius={[6, 6, 0, 0]}>
-                  {budgetChartData.map((entry, index) => (
+                  {budgetRows.map((entry, index) => (
                     <Cell key={index} fill={entry.isOver ? 'hsl(var(--budget-over))' : 'hsl(var(--budget-under))'} />
                   ))}
                 </Bar>
@@ -482,42 +612,43 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
             </ResponsiveContainer>
           </div>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
-            {budgetChartData.map((d, i) => (
-              <motion.div key={d.month} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.05 }}
-                className={`rounded-xl p-3 text-center font-display border border-border mcm-shadow-sm ${d.isOver ? 'bg-budget-over/15 text-budget-over' : 'bg-budget-under/15 text-budget-under'}`}>
-                <p className="text-xs opacity-75">{d.month}</p>
-                <p className="font-bold text-lg">{d.isOver ? '🔴' : '🟢'} £{Math.abs(d.diff).toFixed(2)}</p>
-                <p className="text-xs">{d.isOver ? 'over' : 'under'}</p>
-              </motion.div>
-            ))}
-          </div>
-        </motion.div>
-      )}
-
-      {/* Cumulative Savings Chart */}
-      {cumulativeData.length > 1 && (
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
-          className="bg-card rounded-2xl border border-border p-6 mcm-shadow">
-          <h3 className="font-display font-bold text-lg mb-1">Cumulative Savings Trend</h3>
-          <p className="text-sm text-muted-foreground mb-4">Running total of savings vs overspend over time</p>
-          <div className="overflow-x-auto -mx-2"><div className="h-64" style={{minWidth:320}}>
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={cumulativeData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="month" tick={{ fontSize: 13 }} />
-                <YAxis tick={{ fontSize: 13 }} tickFormatter={(v) => `£${v}`} />
-                <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', fontSize: '13px' }} formatter={(value: number) => [`£${value.toFixed(2)}`, 'Net Savings']} />
-                <Area type="monotone" dataKey="cumulative" fill="hsl(var(--accent) / 0.2)" stroke="hsl(var(--accent))" strokeWidth={3} dot={{ r: 6, fill: 'hsl(var(--accent))' }} name="Cumulative" />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
-          </div>
         </motion.div>
       )}
 
       {/* Vacations Budget Chart */}
       <VacationsChart data={data} />
+
+      {/* Personal Investments per Month */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
+        className="bg-card rounded-2xl border border-border p-6 mcm-shadow">
+        <div className="flex items-start justify-between gap-3 flex-wrap mb-4">
+          <div>
+            <h3 className="font-display font-bold text-lg mb-1">📊 Personal Investments per Month</h3>
+            <p className="text-sm text-muted-foreground">Everything you put into investments each month, with a cumulative trend.</p>
+          </div>
+          <RangeToggle value={rangeInvest} onChange={setRangeInvest} />
+        </div>
+        <div className="overflow-x-auto -mx-2"><div className="h-72" style={{ minWidth: 320 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={(() => { let run = 0; return investmentRows.map(r => { run += r.invested; return { ...r, cumulative: run }; }); })()}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <XAxis dataKey="month" tick={{ fontSize: 13 }} />
+              <YAxis tick={{ fontSize: 13 }} tickFormatter={(v) => `£${v}`} />
+              <Tooltip
+                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', fontSize: '13px' }}
+                formatter={(v: number, n: string) => [`£${v.toFixed(2)}`, n]}
+              />
+              <Legend wrapperStyle={{ fontSize: '13px' }} />
+              <Bar dataKey="invested" name="Invested this month" fill="hsl(210, 60%, 45%)" radius={[6, 6, 0, 0]} maxBarSize={80}>
+                <LabelList dataKey="invested" position="top" formatter={(v: number) => v > 0 ? `£${v.toFixed(0)}` : ''}
+                  style={{ fontSize: '11px', fontWeight: 700, fill: 'hsl(var(--foreground))' }} />
+              </Bar>
+              <Line type="monotone" dataKey="cumulative" name="Cumulative invested" stroke="hsl(210, 70%, 30%)"
+                strokeWidth={2.5} dot={{ r: 4 }} />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div></div>
+      </motion.div>
     </div>
   );
 }
@@ -568,7 +699,7 @@ function VacationsChart({ data }: { data: BudgetData }) {
       className="bg-card rounded-2xl border border-border p-6 mcm-shadow">
       <div className="flex items-start justify-between mb-1 flex-wrap gap-2">
         <div>
-          <h3 className="font-display font-bold text-lg">✈️ Vacations Budget {thisYear}</h3>
+          <h3 className="font-display font-bold text-lg">✈️ Vacations Budget</h3>
           <p className="text-sm text-muted-foreground">Flights + Travel Spend vs annual budget. Cumulative YTD.</p>
         </div>
         <div className={`text-right rounded-xl px-4 py-2 border ${isOver ? 'bg-budget-over/10 border-budget-over/30' : 'bg-budget-under/10 border-budget-under/30'}`}>

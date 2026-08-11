@@ -14,6 +14,7 @@ export const DEFAULT_CATEGORIES = [
   'Flights',
   'Travel Spend',
   'Insurance',
+  'One-off Spend',
   'Other',
 ] as const;
 
@@ -62,6 +63,7 @@ export const DEFAULT_CATEGORY_COLORS: Record<DefaultCategory, string> = {
   'Flights':           'hsl(280, 25%, 50%)',
   'Travel Spend':      'hsl(190, 35%, 45%)',
   'Insurance':         'hsl(20, 55%, 45%)',
+  'One-off Spend':     'hsl(310, 40%, 50%)',
   'Other':             'hsl(35, 12%, 50%)',
 };
 
@@ -81,6 +83,7 @@ export const DEFAULT_CATEGORY_EMOJI: Record<DefaultCategory, string> = {
   'Flights': '✈️',
   'Travel Spend': '🧳',
   'Insurance': '🛡️',
+  'One-off Spend': '⚡',
   'Other': '📦',
 };
 
@@ -122,6 +125,41 @@ export interface AnnualBudget {
   categories: string[];
 }
 
+/** A locked-in budget plan: monthly amounts per category over a date range. */
+export interface BudgetPlan {
+  id: string;
+  startDate: string; // YYYY-MM-DD
+  endDate: string;   // YYYY-MM-DD
+  categories: Record<string, number>; // category → monthly £ budget
+  locked: boolean;
+}
+
+export type InvestmentFrequency = 'weekly' | 'fortnightly' | 'monthly';
+
+export interface RecurringInvestment {
+  id: string;
+  amount: number;
+  platform: string;
+  startDate: string;
+  endDate?: string;
+  frequency: InvestmentFrequency;
+  dayOfWeek?: number; // 0=Sun … 6=Sat
+  note?: string;
+  active: boolean;
+}
+
+/** Categories shown as budget progress rings at the top of the weekly view. */
+export const WEEKLY_RING_CATEGORIES = [
+  'Groceries',
+  'Eating Out',
+  'Coffee',
+  'Transport',
+  'Home Improvement',
+  'Shopping',
+  'Gifts',
+  'Health & Wellness',
+] as const;
+
 export interface BudgetData {
   entries: SpendEntry[];
   monthlyBudgets: MonthlyBudget[];
@@ -131,6 +169,8 @@ export interface BudgetData {
   recurringPayments?: RecurringPayment[];
   investmentEntries?: InvestmentEntry[];
   investmentPlatforms?: string[];
+  budgetPlan?: BudgetPlan | null;
+  recurringInvestments?: RecurringInvestment[];
 }
 
 export interface RecurringPayment {

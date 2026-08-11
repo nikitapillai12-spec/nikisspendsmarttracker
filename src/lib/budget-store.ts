@@ -1,4 +1,4 @@
-import { BudgetData, SpendEntry, CustomCategory, RecurringPayment, InvestmentEntry, AnnualBudget, DEFAULT_INVESTMENT_PLATFORMS } from './budget-types';
+import { BudgetData, SpendEntry, CustomCategory, RecurringPayment, InvestmentEntry, AnnualBudget, BudgetPlan, RecurringInvestment, DEFAULT_INVESTMENT_PLATFORMS } from './budget-types';
 import { supabase } from '@/integrations/supabase/client';
 import { getStoredVaultId } from './vault-store';
 
@@ -12,10 +12,36 @@ let cache: BudgetData = {
   recurringPayments: [],
   investmentEntries: [],
   investmentPlatforms: [],
+  budgetPlan: null,
+  recurringInvestments: [],
 };
 
 let initialized = false;
 const listeners = new Set<(d: BudgetData) => void>();
+
+function mapPlan(r: any): BudgetPlan {
+  return {
+    id: r.id,
+    startDate: r.start_date,
+    endDate: r.end_date,
+    categories: (r.categories || {}) as Record<string, number>,
+    locked: !!r.locked,
+  };
+}
+
+function mapRecInv(r: any): RecurringInvestment {
+  return {
+    id: r.id,
+    amount: Number(r.amount),
+    platform: r.platform,
+    startDate: r.start_date,
+    endDate: r.end_date ?? undefined,
+    frequency: (r.frequency ?? 'monthly') as RecurringInvestment['frequency'],
+    dayOfWeek: r.day_of_week ?? undefined,
+    note: r.note ?? undefined,
+    active: !!r.active,
+  };
+}
 
 function notify() {
   const snap = { ...cache };
@@ -33,6 +59,65 @@ function vaultId(): string {
   return id;
 }
 
+async function fetchAll(vid: string): Promise<BudgetData> {
+  const [entriesRes, mbRes, cbRes, ccRes, rpRes, ieRes, ipRes, abRes, bpRes, riRes] = await Promise.all([
+    supabase.from('spend_entries').select('*').eq('vault_id', vid),
+    supabase.from('monthly_budgets').select('*').eq('vault_id', vid),
+    supabase.from('category_budgets').select('*').eq('vault_id', vid),
+    supabase.from('custom_categories').select('*').eq('vault_id', vid),
+    supabase.from('recurring_payments').select('*').eq('vault_id', vid),
+    supabase.from('investment_entries').select('*').eq('vault_id', vid),
+    supabase.from('investment_platforms').select('*').eq('vault_id', vid),
+    supabase.from('annual_budgets').select('*').eq('vault_id', vid),
+    supabase.from('budget_plans').select('*').eq('vault_id', vid).order('created_at', { ascending: false }).limit(1),
+    supabase.from('recurring_investments').select('*').eq('vault_id', vid),
+  ]);
+
+  return {
+    entries: (entriesRes.data || []).map(r => ({
+      id: r.id,
+      amount: Number(r.amount),
+      category: r.category,
+      date: r.entry_date,
+      createdAt: new Date(r.created_at).getTime(),
+      note: (r as any).note ?? undefined,
+      type: ((r as any).type ?? 'spend') as 'spend' | 'credit' | 'investment',
+      refundPairId: (r as any).refund_pair_id ?? undefined,
+    })),
+    monthlyBudgets: (mbRes.data || []).map(r => ({ month: r.month, amount: Number(r.amount) })),
+    categoryBudgets: (cbRes.data || []).map(r => ({
+      category: r.category, month: r.month, amount: Number(r.amount),
+    })),
+    annualBudgets: (abRes.data || []).map(r => ({
+      year: Number(r.year), label: r.label, amount: Number(r.amount), categories: r.categories as string[],
+    })),
+    customCategories: (ccRes.data || []).map(r => ({
+      name: r.name, emoji: r.emoji, color: r.color,
+      type: ((r as any).type ?? 'spend') as 'spend' | 'credit',
+    })),
+    recurringPayments: (rpRes.data || []).map(r => ({
+      id: r.id,
+      label: r.label,
+      amount: Number(r.amount),
+      category: r.category,
+      startMonth: r.start_month,
+      endMonth: r.end_month ?? undefined,
+      active: r.active,
+    })),
+    investmentEntries: (ieRes.data || []).map(r => ({
+      id: r.id,
+      amount: Number(r.amount),
+      platform: r.platform,
+      date: r.entry_date,
+      note: r.note ?? undefined,
+      createdAt: new Date(r.created_at).getTime(),
+    })),
+    investmentPlatforms: (ipRes.data || []).map(r => r.name),
+    budgetPlan: (bpRes.data && bpRes.data.length) ? mapPlan(bpRes.data[0]) : null,
+    recurringInvestments: (riRes.data || []).map(mapRecInv),
+  };
+}
+
 export async function initStore(): Promise<BudgetData> {
   const vid = getStoredVaultId();
   if (!vid) {
@@ -40,68 +125,7 @@ export async function initStore(): Promise<BudgetData> {
     return cache;
   }
   try {
-    const [entriesRes, mbRes, cbRes, ccRes, rpRes, ieRes, ipRes, abRes] = await Promise.all([
-      supabase.from('spend_entries').select('*').eq('vault_id', vid),
-      supabase.from('monthly_budgets').select('*').eq('vault_id', vid),
-      supabase.from('category_budgets').select('*').eq('vault_id', vid),
-      supabase.from('custom_categories').select('*').eq('vault_id', vid),
-      supabase.from('recurring_payments').select('*').eq('vault_id', vid),
-      supabase.from('investment_entries').select('*').eq('vault_id', vid),
-      supabase.from('investment_platforms').select('*').eq('vault_id', vid),
-      supabase.from('annual_budgets').select('*').eq('vault_id', vid),
-    ]);
-
-    cache = {
-      entries: (entriesRes.data || []).map(r => ({
-        id: r.id,
-        amount: Number(r.amount),
-        category: r.category,
-        date: r.entry_date,
-        createdAt: new Date(r.created_at).getTime(),
-        note: (r as any).note ?? undefined,
-        type: ((r as any).type ?? 'spend') as 'spend' | 'credit' | 'investment',
-        refundPairId: (r as any).refund_pair_id ?? undefined,
-      })),
-      monthlyBudgets: (mbRes.data || []).map(r => ({
-        month: r.month,
-        amount: Number(r.amount),
-      })),
-      categoryBudgets: (cbRes.data || []).map(r => ({
-        category: r.category,
-        month: r.month,
-        amount: Number(r.amount),
-      })),
-      annualBudgets: (abRes.data || []).map(r => ({
-        year: Number(r.year),
-        label: r.label,
-        amount: Number(r.amount),
-        categories: r.categories as string[],
-      })),
-      customCategories: (ccRes.data || []).map(r => ({
-        name: r.name,
-        emoji: r.emoji,
-        color: r.color,
-        type: ((r as any).type ?? 'spend') as 'spend' | 'credit',
-      })),
-      recurringPayments: (rpRes.data || []).map(r => ({
-        id: r.id,
-        label: r.label,
-        amount: Number(r.amount),
-        category: r.category,
-        startMonth: r.start_month,
-        endMonth: r.end_month ?? undefined,
-        active: r.active,
-      })),
-      investmentEntries: (ieRes.data || []).map(r => ({
-        id: r.id,
-        amount: Number(r.amount),
-        platform: r.platform,
-        date: r.entry_date,
-        note: r.note ?? undefined,
-        createdAt: new Date(r.created_at).getTime(),
-      })),
-      investmentPlatforms: (ipRes.data || []).map(r => r.name),
-    };
+    cache = await fetchAll(vid);
     await ensureDefaultPlatforms(vid);
   } catch (e) {
     console.error('initStore failed', e);
@@ -140,57 +164,7 @@ async function refetchAll() {
   const vid = getStoredVaultId();
   if (!vid) return;
   try {
-    const [entriesRes, mbRes, cbRes, ccRes, rpRes, ieRes, ipRes, abRes] = await Promise.all([
-      supabase.from('spend_entries').select('*').eq('vault_id', vid),
-      supabase.from('monthly_budgets').select('*').eq('vault_id', vid),
-      supabase.from('category_budgets').select('*').eq('vault_id', vid),
-      supabase.from('custom_categories').select('*').eq('vault_id', vid),
-      supabase.from('recurring_payments').select('*').eq('vault_id', vid),
-      supabase.from('investment_entries').select('*').eq('vault_id', vid),
-      supabase.from('investment_platforms').select('*').eq('vault_id', vid),
-      supabase.from('annual_budgets').select('*').eq('vault_id', vid),
-    ]);
-    cache = {
-      entries: (entriesRes.data || []).map(r => ({
-        id: r.id,
-        amount: Number(r.amount),
-        category: r.category,
-        date: r.entry_date,
-        createdAt: new Date(r.created_at).getTime(),
-        note: (r as any).note ?? undefined,
-        type: ((r as any).type ?? 'spend') as 'spend' | 'credit' | 'investment',
-        refundPairId: (r as any).refund_pair_id ?? undefined,
-      })),
-      monthlyBudgets: (mbRes.data || []).map(r => ({ month: r.month, amount: Number(r.amount) })),
-      categoryBudgets: (cbRes.data || []).map(r => ({
-        category: r.category, month: r.month, amount: Number(r.amount),
-      })),
-      annualBudgets: (abRes.data || []).map(r => ({
-        year: Number(r.year), label: r.label, amount: Number(r.amount), categories: r.categories as string[],
-      })),
-      customCategories: (ccRes.data || []).map(r => ({
-        name: r.name, emoji: r.emoji, color: r.color,
-        type: ((r as any).type ?? 'spend') as 'spend' | 'credit',
-      })),
-      recurringPayments: (rpRes.data || []).map(r => ({
-        id: r.id,
-        label: r.label,
-        amount: Number(r.amount),
-        category: r.category,
-        startMonth: r.start_month,
-        endMonth: r.end_month ?? undefined,
-        active: r.active,
-      })),
-      investmentEntries: (ieRes.data || []).map(r => ({
-        id: r.id,
-        amount: Number(r.amount),
-        platform: r.platform,
-        date: r.entry_date,
-        note: r.note ?? undefined,
-        createdAt: new Date(r.created_at).getTime(),
-      })),
-      investmentPlatforms: (ipRes.data || []).map(r => r.name),
-    };
+    cache = await fetchAll(vid);
     notify();
   } catch (e) {
     console.error('refetchAll failed', e);
@@ -217,6 +191,8 @@ function setupRealtime() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'investment_entries', filter }, scheduleRefetch)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'investment_platforms', filter }, scheduleRefetch)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'annual_budgets', filter }, scheduleRefetch)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'budget_plans', filter }, scheduleRefetch)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'recurring_investments', filter }, scheduleRefetch)
     .subscribe();
 }
 
@@ -800,4 +776,109 @@ function mergePatterns(a: LearnedPattern[], b: LearnedPattern[]): LearnedPattern
     else { result.push(bp); }
   }
   return result;
+}
+
+// ---------- Budget plan (Setup page) ----------
+
+/** Creates or updates the single budget plan for this vault. */
+export async function saveBudgetPlan(plan: Omit<BudgetPlan, 'id'> & { id?: string }): Promise<BudgetData> {
+  const vid = vaultId();
+  const row = {
+    vault_id: vid,
+    start_date: plan.startDate,
+    end_date: plan.endDate,
+    categories: plan.categories as never,
+    locked: plan.locked,
+  };
+  if (plan.id) {
+    cache.budgetPlan = { ...plan, id: plan.id } as BudgetPlan;
+    notify();
+    const { error } = await supabase.from('budget_plans').update(row).eq('id', plan.id).eq('vault_id', vid);
+    if (error) console.error('saveBudgetPlan update', error);
+  } else {
+    const { data, error } = await supabase.from('budget_plans').insert(row).select().maybeSingle();
+    if (error) console.error('saveBudgetPlan insert', error);
+    if (data) cache.budgetPlan = mapPlan(data);
+    notify();
+  }
+  return cache;
+}
+
+export async function deleteBudgetPlan(id: string): Promise<BudgetData> {
+  cache.budgetPlan = null;
+  notify();
+  const { error } = await supabase.from('budget_plans').delete().eq('id', id).eq('vault_id', vaultId());
+  if (error) console.error('deleteBudgetPlan', error);
+  return cache;
+}
+
+/** True if the plan is locked and the given YYYY-MM-DD date falls inside its range. */
+export function isPlanActiveOn(plan: BudgetPlan | null | undefined, date: string): boolean {
+  if (!plan || !plan.locked) return false;
+  return date >= plan.startDate && date <= plan.endDate;
+}
+
+/** Monthly budget for a category from the locked plan, for a given YYYY-MM month. */
+export function getPlanCategoryBudget(data: BudgetData, category: string, month: string): number | null {
+  const plan = data.budgetPlan;
+  if (!plan || !plan.locked) return null;
+  if (month < plan.startDate.slice(0, 7) || month > plan.endDate.slice(0, 7)) return null;
+  const v = plan.categories?.[category];
+  return typeof v === 'number' && v > 0 ? v : null;
+}
+
+/** Total monthly budget from the locked plan for a given month, or null. */
+export function getPlanMonthlyTotal(data: BudgetData, month: string): number | null {
+  const plan = data.budgetPlan;
+  if (!plan || !plan.locked) return null;
+  if (month < plan.startDate.slice(0, 7) || month > plan.endDate.slice(0, 7)) return null;
+  const total = Object.values(plan.categories || {}).reduce((s, v) => s + (Number(v) || 0), 0);
+  return total > 0 ? total : null;
+}
+
+// ---------- Recurring investments ----------
+export function addRecurringInvestment(r: RecurringInvestment): BudgetData {
+  cache.recurringInvestments = [...(cache.recurringInvestments || []), r];
+  notify();
+  supabase.from('recurring_investments').insert({
+    id: r.id,
+    vault_id: vaultId(),
+    amount: r.amount,
+    platform: r.platform,
+    start_date: r.startDate,
+    end_date: r.endDate ?? null,
+    frequency: r.frequency,
+    day_of_week: r.dayOfWeek ?? null,
+    note: r.note ?? null,
+    active: r.active,
+  }).then(({ error }) => { if (error) console.error('addRecurringInvestment sync', error); });
+  return cache;
+}
+
+export function deleteRecurringInvestment(id: string): BudgetData {
+  cache.recurringInvestments = (cache.recurringInvestments || []).filter(r => r.id !== id);
+  notify();
+  supabase.from('recurring_investments').delete().eq('id', id)
+    .then(({ error }) => { if (error) console.error('deleteRecurringInvestment sync', error); });
+  return cache;
+}
+
+export function updateRecurringInvestment(id: string, updates: Partial<Omit<RecurringInvestment, 'id'>>): BudgetData {
+  cache.recurringInvestments = (cache.recurringInvestments || []).map(r => r.id === id ? { ...r, ...updates } : r);
+  notify();
+  const patch: {
+    amount?: number; platform?: string; start_date?: string; end_date?: string | null;
+    frequency?: string; day_of_week?: number | null; note?: string | null; active?: boolean;
+  } = {};
+  if (updates.amount !== undefined) patch.amount = updates.amount;
+  if (updates.platform !== undefined) patch.platform = updates.platform;
+  if (updates.startDate !== undefined) patch.start_date = updates.startDate;
+  if (updates.endDate !== undefined) patch.end_date = updates.endDate ?? null;
+  if (updates.frequency !== undefined) patch.frequency = updates.frequency;
+  if (updates.dayOfWeek !== undefined) patch.day_of_week = updates.dayOfWeek ?? null;
+  if (updates.note !== undefined) patch.note = updates.note ?? null;
+  if (updates.active !== undefined) patch.active = updates.active;
+  supabase.from('recurring_investments').update(patch).eq('id', id)
+    .then(({ error }) => { if (error) console.error('updateRecurringInvestment sync', error); });
+  return cache;
 }
