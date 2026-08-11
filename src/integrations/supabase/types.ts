@@ -73,6 +73,47 @@ export type Database = {
         }
         Relationships: []
       }
+      budget_plans: {
+        Row: {
+          categories: Json
+          created_at: string
+          end_date: string
+          id: string
+          locked: boolean
+          start_date: string
+          updated_at: string
+          vault_id: string
+        }
+        Insert: {
+          categories?: Json
+          created_at?: string
+          end_date: string
+          id?: string
+          locked?: boolean
+          start_date: string
+          updated_at?: string
+          vault_id: string
+        }
+        Update: {
+          categories?: Json
+          created_at?: string
+          end_date?: string
+          id?: string
+          locked?: boolean
+          start_date?: string
+          updated_at?: string
+          vault_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budget_plans_vault_id_fkey"
+            columns: ["vault_id"]
+            isOneToOne: false
+            referencedRelation: "vaults"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       category_budgets: {
         Row: {
           amount: number
@@ -216,6 +257,59 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "monthly_budgets_vault_id_fkey"
+            columns: ["vault_id"]
+            isOneToOne: false
+            referencedRelation: "vaults"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recurring_investments: {
+        Row: {
+          active: boolean
+          amount: number
+          created_at: string
+          day_of_week: number | null
+          end_date: string | null
+          frequency: string
+          id: string
+          note: string | null
+          platform: string
+          start_date: string
+          updated_at: string
+          vault_id: string
+        }
+        Insert: {
+          active?: boolean
+          amount: number
+          created_at?: string
+          day_of_week?: number | null
+          end_date?: string | null
+          frequency?: string
+          id?: string
+          note?: string | null
+          platform: string
+          start_date: string
+          updated_at?: string
+          vault_id: string
+        }
+        Update: {
+          active?: boolean
+          amount?: number
+          created_at?: string
+          day_of_week?: number | null
+          end_date?: string | null
+          frequency?: string
+          id?: string
+          note?: string | null
+          platform?: string
+          start_date?: string
+          updated_at?: string
+          vault_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recurring_investments_vault_id_fkey"
             columns: ["vault_id"]
             isOneToOne: false
             referencedRelation: "vaults"
