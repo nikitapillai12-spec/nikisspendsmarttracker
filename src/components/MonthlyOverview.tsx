@@ -54,7 +54,7 @@ function RangeToggle({ value, onChange }: { value: RangeKey; onChange: (r: Range
   );
 }
 
-function useRangeFilter<T extends { monthKey: string }>(rows: T[], range: RangeKey): T[] {
+function filterRange<T extends { monthKey: string }>(rows: T[], range: RangeKey): T[] {
   const cutoff = rangeCutoff(range);
   return cutoff ? rows.filter(r => r.monthKey >= cutoff) : rows;
 }
