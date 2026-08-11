@@ -17,7 +17,19 @@ function statusColor(pct: number): string {
 
 function Ring({
   label, emoji, spent, budget,
-}: { label: string; emoji: string; spent: number; budget: number }) {
+}: { label: string; emoji: string; spent: number; budget: number | null }) {
+  if (budget === null) {
+    return (
+      <div className="rounded-xl border border-dashed border-border bg-secondary/30 px-3 py-3 flex flex-col items-center text-center">
+        <div className="w-[68px] h-[68px] rounded-full border-[7px] border-secondary flex flex-col items-center justify-center leading-none">
+          <span className="text-base">{emoji}</span>
+        </div>
+        <div className="mt-1.5 text-[11px] font-semibold truncate w-full" title={label}>{label}</div>
+        <div className="text-[11px] text-muted-foreground">£{spent.toFixed(0)} spent</div>
+        <div className="text-[11px] text-muted-foreground">No budget set</div>
+      </div>
+    );
+  }
   const pct = budget > 0 ? (spent / budget) * 100 : 0;
   const clamped = Math.min(100, pct);
   const color = statusColor(pct);
@@ -56,15 +68,16 @@ export function BudgetRings({ data, weekStart, weekEnd }: Props) {
 
   const rings = WEEKLY_RING_CATEGORIES.map(cat => {
     const monthly = getPlanCategoryBudget(data, cat, month);
-    if (monthly === null) return null;
-    const budget = getWeeklyBudget(monthly);
+    const budget = monthly === null ? null : getWeeklyBudget(monthly);
     const spent = data.entries
       .filter(e => (e.type ?? 'spend') === 'spend' && e.category === cat && e.date >= weekStart && e.date <= weekEnd)
       .reduce((s, e) => s + e.amount, 0);
     return { cat, budget, spent };
-  }).filter(Boolean) as { cat: string; budget: number; spent: number }[];
+  });
 
-  if (rings.length === 0) {
+  const hasAnyBudget = rings.some(r => r.budget !== null);
+
+  if (!hasAnyBudget) {
     return (
       <div className="rounded-xl border border-dashed border-border bg-secondary/40 px-4 py-3 text-sm text-muted-foreground">
         No locked budget yet — set your monthly category budgets on the <strong>Set Up</strong> tab to see your

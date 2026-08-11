@@ -793,12 +793,23 @@ export async function saveBudgetPlan(plan: Omit<BudgetPlan, 'id'> & { id?: strin
   if (plan.id) {
     cache.budgetPlan = { ...plan, id: plan.id } as BudgetPlan;
     notify();
-    const { error } = await supabase.from('budget_plans').update(row).eq('id', plan.id).eq('vault_id', vid);
+    const { data, error } = await supabase
+      .from('budget_plans').update(row).eq('id', plan.id).eq('vault_id', vid).select();
     if (error) console.error('saveBudgetPlan update', error);
+    if (!error && (!data || data.length === 0)) {
+      // Row no longer exists (e.g. deleted elsewhere) — recreate it.
+      const ins = await supabase.from('budget_plans').insert(row).select().maybeSingle();
+      if (ins.error) console.error('saveBudgetPlan re-insert', ins.error);
+      if (ins.data) cache.budgetPlan = mapPlan(ins.data);
+    } else if (data && data.length) {
+      cache.budgetPlan = mapPlan(data[0]);
+    }
+    notify();
   } else {
     const { data, error } = await supabase.from('budget_plans').insert(row).select().maybeSingle();
     if (error) console.error('saveBudgetPlan insert', error);
     if (data) cache.budgetPlan = mapPlan(data);
+    else cache.budgetPlan = { ...plan, id: plan.id ?? 'local' } as BudgetPlan;
     notify();
   }
   return cache;
@@ -821,7 +832,7 @@ export function isPlanActiveOn(plan: BudgetPlan | null | undefined, date: string
 /** Monthly budget for a category from the locked plan, for a given YYYY-MM month. */
 export function getPlanCategoryBudget(data: BudgetData, category: string, month: string): number | null {
   const plan = data.budgetPlan;
-  if (!plan || !plan.locked) return null;
+  if (!plan) return null;
   if (month < plan.startDate.slice(0, 7) || month > plan.endDate.slice(0, 7)) return null;
   const v = plan.categories?.[category];
   return typeof v === 'number' && v > 0 ? v : null;
@@ -830,7 +841,7 @@ export function getPlanCategoryBudget(data: BudgetData, category: string, month:
 /** Total monthly budget from the locked plan for a given month, or null. */
 export function getPlanMonthlyTotal(data: BudgetData, month: string): number | null {
   const plan = data.budgetPlan;
-  if (!plan || !plan.locked) return null;
+  if (!plan) return null;
   if (month < plan.startDate.slice(0, 7) || month > plan.endDate.slice(0, 7)) return null;
   const total = Object.values(plan.categories || {}).reduce((s, v) => s + (Number(v) || 0), 0);
   return total > 0 ? total : null;

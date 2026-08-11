@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Lock, Unlock, Target } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -22,7 +22,13 @@ export function SetupView({ data, onDataChange }: Props) {
   const [endDate, setEndDate] = useState('');
   const [saving, setSaving] = useState(false);
 
+  // Initialise from the saved plan only once per plan id, so typing is never wiped
+  // by background refreshes (realtime sync, category loads, etc.).
+  const initedFor = useRef<string | null>(null);
   useEffect(() => {
+    const key = plan?.id ?? 'new';
+    if (initedFor.current === key) return;
+    initedFor.current = key;
     const init: Record<string, string> = {};
     spendCats.forEach(c => {
       const v = plan?.categories?.[c];
@@ -33,7 +39,7 @@ export function SetupView({ data, onDataChange }: Props) {
     setStartDate(plan?.startDate ?? `${today.getFullYear()}-01-01`);
     setEndDate(plan?.endDate ?? `${today.getFullYear()}-12-31`);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [plan?.id, plan?.locked, spendCats.length]);
+  }, [plan?.id, spendCats.length]);
 
   const locked = !!plan?.locked;
 
@@ -69,7 +75,7 @@ export function SetupView({ data, onDataChange }: Props) {
     });
     setSaving(false);
     onDataChange(latest);
-    toast(lockedFlag ? 'Budget locked in ✅' : 'Budget unlocked for editing');
+    toast(lockedFlag ? 'Budget locked in ✅' : 'Budget saved — unlocked for editing');
   };
 
   return (
@@ -77,8 +83,9 @@ export function SetupView({ data, onDataChange }: Props) {
       <div>
         <h2 className="font-display font-normal text-3xl tracking-wide">Set Up</h2>
         <p className="text-base text-muted-foreground">
-          Set a monthly budget per spend category. We divide each one into a weekly budget
-          (monthly × 12 ÷ 52) and track your weekly progress against it.
+          Set a monthly budget for the categories that matter — you can leave the rest blank.
+          We divide each one into a weekly budget (monthly × 12 ÷ 52) and track your weekly
+          progress against it.
         </p>
       </div>
 
@@ -148,6 +155,12 @@ export function SetupView({ data, onDataChange }: Props) {
         </div>
 
         <div className="flex flex-wrap gap-2 mt-5">
+          {locked && (
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }}
+              className="rounded-xl bg-budget-under/15 text-budget-under px-4 py-2 text-sm font-semibold flex items-center gap-2">
+              <Lock className="w-4 h-4" /> Locked — applied from {plan?.startDate} to {plan?.endDate}
+            </motion.div>
+          )}
           {!locked ? (
             <>
               <Button onClick={() => persist(true)} disabled={saving} className="gap-2">
@@ -159,17 +172,18 @@ export function SetupView({ data, onDataChange }: Props) {
             </>
           ) : (
             <>
-              <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }}
-                className="rounded-xl bg-budget-under/15 text-budget-under px-4 py-2 text-sm font-semibold flex items-center gap-2">
-                <Lock className="w-4 h-4" /> Locked — applied to every week &amp; month from{' '}
-                {plan?.startDate} to {plan?.endDate}
-              </motion.div>
               <Button variant="outline" className="gap-2" onClick={() => persist(false)} disabled={saving}>
                 <Unlock className="w-4 h-4" /> Unlock to edit
+              </Button>
+              <Button onClick={() => persist(true)} disabled={saving} className="gap-2">
+                <Lock className="w-4 h-4" /> Save changes
               </Button>
             </>
           )}
         </div>
+        <p className="text-sm text-muted-foreground mt-2">
+          Budgets show up as progress rings at the top of every weekly view — locked or draft.
+        </p>
       </div>
     </div>
   );
