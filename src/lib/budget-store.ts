@@ -59,6 +59,65 @@ function vaultId(): string {
   return id;
 }
 
+async function fetchAll(vid: string): Promise<BudgetData> {
+  const [entriesRes, mbRes, cbRes, ccRes, rpRes, ieRes, ipRes, abRes, bpRes, riRes] = await Promise.all([
+    supabase.from('spend_entries').select('*').eq('vault_id', vid),
+    supabase.from('monthly_budgets').select('*').eq('vault_id', vid),
+    supabase.from('category_budgets').select('*').eq('vault_id', vid),
+    supabase.from('custom_categories').select('*').eq('vault_id', vid),
+    supabase.from('recurring_payments').select('*').eq('vault_id', vid),
+    supabase.from('investment_entries').select('*').eq('vault_id', vid),
+    supabase.from('investment_platforms').select('*').eq('vault_id', vid),
+    supabase.from('annual_budgets').select('*').eq('vault_id', vid),
+    supabase.from('budget_plans').select('*').eq('vault_id', vid).order('created_at', { ascending: false }).limit(1),
+    supabase.from('recurring_investments').select('*').eq('vault_id', vid),
+  ]);
+
+  return {
+    entries: (entriesRes.data || []).map(r => ({
+      id: r.id,
+      amount: Number(r.amount),
+      category: r.category,
+      date: r.entry_date,
+      createdAt: new Date(r.created_at).getTime(),
+      note: (r as any).note ?? undefined,
+      type: ((r as any).type ?? 'spend') as 'spend' | 'credit' | 'investment',
+      refundPairId: (r as any).refund_pair_id ?? undefined,
+    })),
+    monthlyBudgets: (mbRes.data || []).map(r => ({ month: r.month, amount: Number(r.amount) })),
+    categoryBudgets: (cbRes.data || []).map(r => ({
+      category: r.category, month: r.month, amount: Number(r.amount),
+    })),
+    annualBudgets: (abRes.data || []).map(r => ({
+      year: Number(r.year), label: r.label, amount: Number(r.amount), categories: r.categories as string[],
+    })),
+    customCategories: (ccRes.data || []).map(r => ({
+      name: r.name, emoji: r.emoji, color: r.color,
+      type: ((r as any).type ?? 'spend') as 'spend' | 'credit',
+    })),
+    recurringPayments: (rpRes.data || []).map(r => ({
+      id: r.id,
+      label: r.label,
+      amount: Number(r.amount),
+      category: r.category,
+      startMonth: r.start_month,
+      endMonth: r.end_month ?? undefined,
+      active: r.active,
+    })),
+    investmentEntries: (ieRes.data || []).map(r => ({
+      id: r.id,
+      amount: Number(r.amount),
+      platform: r.platform,
+      date: r.entry_date,
+      note: r.note ?? undefined,
+      createdAt: new Date(r.created_at).getTime(),
+    })),
+    investmentPlatforms: (ipRes.data || []).map(r => r.name),
+    budgetPlan: (bpRes.data && bpRes.data.length) ? mapPlan(bpRes.data[0]) : null,
+    recurringInvestments: (riRes.data || []).map(mapRecInv),
+  };
+}
+
 export async function initStore(): Promise<BudgetData> {
   const vid = getStoredVaultId();
   if (!vid) {
@@ -66,68 +125,7 @@ export async function initStore(): Promise<BudgetData> {
     return cache;
   }
   try {
-    const [entriesRes, mbRes, cbRes, ccRes, rpRes, ieRes, ipRes, abRes] = await Promise.all([
-      supabase.from('spend_entries').select('*').eq('vault_id', vid),
-      supabase.from('monthly_budgets').select('*').eq('vault_id', vid),
-      supabase.from('category_budgets').select('*').eq('vault_id', vid),
-      supabase.from('custom_categories').select('*').eq('vault_id', vid),
-      supabase.from('recurring_payments').select('*').eq('vault_id', vid),
-      supabase.from('investment_entries').select('*').eq('vault_id', vid),
-      supabase.from('investment_platforms').select('*').eq('vault_id', vid),
-      supabase.from('annual_budgets').select('*').eq('vault_id', vid),
-    ]);
-
-    cache = {
-      entries: (entriesRes.data || []).map(r => ({
-        id: r.id,
-        amount: Number(r.amount),
-        category: r.category,
-        date: r.entry_date,
-        createdAt: new Date(r.created_at).getTime(),
-        note: (r as any).note ?? undefined,
-        type: ((r as any).type ?? 'spend') as 'spend' | 'credit' | 'investment',
-        refundPairId: (r as any).refund_pair_id ?? undefined,
-      })),
-      monthlyBudgets: (mbRes.data || []).map(r => ({
-        month: r.month,
-        amount: Number(r.amount),
-      })),
-      categoryBudgets: (cbRes.data || []).map(r => ({
-        category: r.category,
-        month: r.month,
-        amount: Number(r.amount),
-      })),
-      annualBudgets: (abRes.data || []).map(r => ({
-        year: Number(r.year),
-        label: r.label,
-        amount: Number(r.amount),
-        categories: r.categories as string[],
-      })),
-      customCategories: (ccRes.data || []).map(r => ({
-        name: r.name,
-        emoji: r.emoji,
-        color: r.color,
-        type: ((r as any).type ?? 'spend') as 'spend' | 'credit',
-      })),
-      recurringPayments: (rpRes.data || []).map(r => ({
-        id: r.id,
-        label: r.label,
-        amount: Number(r.amount),
-        category: r.category,
-        startMonth: r.start_month,
-        endMonth: r.end_month ?? undefined,
-        active: r.active,
-      })),
-      investmentEntries: (ieRes.data || []).map(r => ({
-        id: r.id,
-        amount: Number(r.amount),
-        platform: r.platform,
-        date: r.entry_date,
-        note: r.note ?? undefined,
-        createdAt: new Date(r.created_at).getTime(),
-      })),
-      investmentPlatforms: (ipRes.data || []).map(r => r.name),
-    };
+    cache = await fetchAll(vid);
     await ensureDefaultPlatforms(vid);
   } catch (e) {
     console.error('initStore failed', e);
@@ -166,57 +164,7 @@ async function refetchAll() {
   const vid = getStoredVaultId();
   if (!vid) return;
   try {
-    const [entriesRes, mbRes, cbRes, ccRes, rpRes, ieRes, ipRes, abRes] = await Promise.all([
-      supabase.from('spend_entries').select('*').eq('vault_id', vid),
-      supabase.from('monthly_budgets').select('*').eq('vault_id', vid),
-      supabase.from('category_budgets').select('*').eq('vault_id', vid),
-      supabase.from('custom_categories').select('*').eq('vault_id', vid),
-      supabase.from('recurring_payments').select('*').eq('vault_id', vid),
-      supabase.from('investment_entries').select('*').eq('vault_id', vid),
-      supabase.from('investment_platforms').select('*').eq('vault_id', vid),
-      supabase.from('annual_budgets').select('*').eq('vault_id', vid),
-    ]);
-    cache = {
-      entries: (entriesRes.data || []).map(r => ({
-        id: r.id,
-        amount: Number(r.amount),
-        category: r.category,
-        date: r.entry_date,
-        createdAt: new Date(r.created_at).getTime(),
-        note: (r as any).note ?? undefined,
-        type: ((r as any).type ?? 'spend') as 'spend' | 'credit' | 'investment',
-        refundPairId: (r as any).refund_pair_id ?? undefined,
-      })),
-      monthlyBudgets: (mbRes.data || []).map(r => ({ month: r.month, amount: Number(r.amount) })),
-      categoryBudgets: (cbRes.data || []).map(r => ({
-        category: r.category, month: r.month, amount: Number(r.amount),
-      })),
-      annualBudgets: (abRes.data || []).map(r => ({
-        year: Number(r.year), label: r.label, amount: Number(r.amount), categories: r.categories as string[],
-      })),
-      customCategories: (ccRes.data || []).map(r => ({
-        name: r.name, emoji: r.emoji, color: r.color,
-        type: ((r as any).type ?? 'spend') as 'spend' | 'credit',
-      })),
-      recurringPayments: (rpRes.data || []).map(r => ({
-        id: r.id,
-        label: r.label,
-        amount: Number(r.amount),
-        category: r.category,
-        startMonth: r.start_month,
-        endMonth: r.end_month ?? undefined,
-        active: r.active,
-      })),
-      investmentEntries: (ieRes.data || []).map(r => ({
-        id: r.id,
-        amount: Number(r.amount),
-        platform: r.platform,
-        date: r.entry_date,
-        note: r.note ?? undefined,
-        createdAt: new Date(r.created_at).getTime(),
-      })),
-      investmentPlatforms: (ipRes.data || []).map(r => r.name),
-    };
+    cache = await fetchAll(vid);
     notify();
   } catch (e) {
     console.error('refetchAll failed', e);
