@@ -1,4 +1,4 @@
-import { BudgetData, SpendEntry, CustomCategory, RecurringPayment, InvestmentEntry, AnnualBudget, DEFAULT_INVESTMENT_PLATFORMS } from './budget-types';
+import { BudgetData, SpendEntry, CustomCategory, RecurringPayment, InvestmentEntry, AnnualBudget, BudgetPlan, RecurringInvestment, DEFAULT_INVESTMENT_PLATFORMS } from './budget-types';
 import { supabase } from '@/integrations/supabase/client';
 import { getStoredVaultId } from './vault-store';
 
@@ -12,10 +12,36 @@ let cache: BudgetData = {
   recurringPayments: [],
   investmentEntries: [],
   investmentPlatforms: [],
+  budgetPlan: null,
+  recurringInvestments: [],
 };
 
 let initialized = false;
 const listeners = new Set<(d: BudgetData) => void>();
+
+function mapPlan(r: any): BudgetPlan {
+  return {
+    id: r.id,
+    startDate: r.start_date,
+    endDate: r.end_date,
+    categories: (r.categories || {}) as Record<string, number>,
+    locked: !!r.locked,
+  };
+}
+
+function mapRecInv(r: any): RecurringInvestment {
+  return {
+    id: r.id,
+    amount: Number(r.amount),
+    platform: r.platform,
+    startDate: r.start_date,
+    endDate: r.end_date ?? undefined,
+    frequency: (r.frequency ?? 'monthly') as RecurringInvestment['frequency'],
+    dayOfWeek: r.day_of_week ?? undefined,
+    note: r.note ?? undefined,
+    active: !!r.active,
+  };
+}
 
 function notify() {
   const snap = { ...cache };
