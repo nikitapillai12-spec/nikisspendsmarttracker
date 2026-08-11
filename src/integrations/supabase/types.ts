@@ -19,6 +19,7 @@ export type Database = {
           amount: number
           categories: Json
           label: string
+          locked: boolean
           updated_at: string
           vault_id: string
           year: number
@@ -27,6 +28,7 @@ export type Database = {
           amount?: number
           categories?: Json
           label: string
+          locked?: boolean
           updated_at?: string
           vault_id: string
           year: number
@@ -35,6 +37,7 @@ export type Database = {
           amount?: number
           categories?: Json
           label?: string
+          locked?: boolean
           updated_at?: string
           vault_id?: string
           year?: number

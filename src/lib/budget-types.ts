@@ -123,6 +123,8 @@ export interface AnnualBudget {
   amount: number;
   /** Categories whose spend counts toward this budget */
   categories: string[];
+  /** Locked budgets are read-only until unlocked in Set Up */
+  locked?: boolean;
 }
 
 /** A locked-in budget plan: monthly amounts per category over a date range. */

@@ -90,6 +90,7 @@ async function fetchAll(vid: string): Promise<BudgetData> {
     })),
     annualBudgets: (abRes.data || []).map(r => ({
       year: Number(r.year), label: r.label, amount: Number(r.amount), categories: r.categories as string[],
+      locked: Boolean((r as any).locked),
     })),
     customCategories: (ccRes.data || []).map(r => ({
       name: r.name, emoji: r.emoji, color: r.color,
@@ -543,7 +544,7 @@ export function setAnnualBudget(budget: AnnualBudget): BudgetData {
   else cache.annualBudgets.push(budget);
   notify();
   supabase.from('annual_budgets').upsert(
-    { vault_id: vaultId(), year: budget.year, label: budget.label, amount: budget.amount, categories: budget.categories },
+    { vault_id: vaultId(), year: budget.year, label: budget.label, amount: budget.amount, categories: budget.categories, locked: budget.locked ?? false },
     { onConflict: 'vault_id,year,label' }
   ).then(({ error }) => { if (error) console.error('setAnnualBudget sync', error); });
   return cache;

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/components/ui/sonner';
 import { BudgetData, getAllCategories, getCategoryColor, getCategoryEmoji } from '@/lib/budget-types';
-import { saveBudgetPlan } from '@/lib/budget-store';
+import { saveBudgetPlan, setAnnualBudget, getAnnualBudget } from '@/lib/budget-store';
 import { getWeeklyBudget } from '@/lib/date-utils';
 
 interface Props {
@@ -21,6 +21,31 @@ export function SetupView({ data, onDataChange }: Props) {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // ----- Annual Vacations budget (Flights + Travel Spend) -----
+  const vacYear = new Date().getFullYear();
+  const vacBudget = (data.annualBudgets || []).find(b => b.year === vacYear && b.label === 'Vacations') ?? null;
+  const [vacInput, setVacInput] = useState('');
+  const vacInited = useRef(false);
+  useEffect(() => {
+    if (vacInited.current) return;
+    vacInited.current = true;
+    setVacInput(vacBudget ? String(vacBudget.amount) : '7000');
+  }, [vacBudget]);
+  const vacLocked = !!vacBudget?.locked;
+
+  const persistVacation = (lockedFlag: boolean) => {
+    const n = parseFloat(vacInput);
+    if (Number.isNaN(n) || n <= 0) { toast('Enter a valid annual vacations budget'); return; }
+    onDataChange(setAnnualBudget({
+      year: vacYear,
+      label: 'Vacations',
+      amount: n,
+      categories: ['Flights', 'Travel Spend'],
+      locked: lockedFlag,
+    }));
+    toast(lockedFlag ? 'Vacations budget locked in ✅' : 'Vacations budget unlocked for editing');
+  };
 
   // Initialise from the saved plan only once per plan id, so typing is never wiped
   // by background refreshes (realtime sync, category loads, etc.).
@@ -184,6 +209,43 @@ export function SetupView({ data, onDataChange }: Props) {
         <p className="text-sm text-muted-foreground mt-2">
           Budgets show up as progress rings at the top of every weekly view — locked or draft.
         </p>
+      </div>
+
+      {/* Annual Vacations budget */}
+      <div className="bg-card rounded-2xl border border-border p-5 mcm-shadow">
+        <h3 className="font-display font-bold text-lg mb-1">✈️ Vacations — annual budget</h3>
+        <p className="text-sm text-muted-foreground mb-3">
+          Covers Flights + Travel Spend for {vacYear}. Tracked separately in the Charts view.
+        </p>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Input
+            type="number"
+            inputMode="decimal"
+            step="0.01"
+            disabled={vacLocked}
+            value={vacInput}
+            onChange={e => setVacInput(e.target.value)}
+            placeholder="e.g. 7000"
+            className="h-10 w-40 text-right"
+          />
+          {!vacLocked ? (
+            <>
+              <Button className="gap-2" onClick={() => persistVacation(true)}>
+                <Lock className="w-4 h-4" /> Lock in
+              </Button>
+              <Button variant="outline" onClick={() => persistVacation(false)}>Save as draft</Button>
+            </>
+          ) : (
+            <>
+              <span className="rounded-xl bg-budget-under/15 text-budget-under px-3 py-2 text-sm font-semibold flex items-center gap-2">
+                <Lock className="w-4 h-4" /> Locked
+              </span>
+              <Button variant="outline" className="gap-2" onClick={() => persistVacation(false)}>
+                <Unlock className="w-4 h-4" /> Unlock to edit
+              </Button>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
