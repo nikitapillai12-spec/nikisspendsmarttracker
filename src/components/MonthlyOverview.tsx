@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { TrendingUp, TrendingDown, X } from 'lucide-react';
 import { BudgetData, getAllCategories, getCategoryColor, getCategoryEmoji, signedAmount } from '@/lib/budget-types';
 import { getMonthsInRange } from '@/lib/date-utils';
-import { getEffectiveMonthlyBudget, getEffectiveCategoryBudget } from '@/lib/budget-store';
+import { getEffectiveMonthlyBudget, getEffectiveCategoryBudget, getPlanMonthlyTotal, getPlanCategoryBudget } from '@/lib/budget-store';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   Line, ComposedChart, Cell, Area, LabelList, ReferenceLine,
@@ -13,6 +13,50 @@ import { Button } from '@/components/ui/button';
 
 interface MonthlyOverviewProps {
   data: BudgetData;
+}
+
+type RangeKey = 'ytd' | '1y' | '2y' | '3y' | 'all';
+
+const RANGE_LABELS: { key: RangeKey; label: string }[] = [
+  { key: 'ytd', label: 'YTD' },
+  { key: '1y', label: '1Y' },
+  { key: '2y', label: '2Y' },
+  { key: '3y', label: '3Y' },
+  { key: 'all', label: 'All' },
+];
+
+/** Earliest YYYY-MM month included for a range, or null for "all". */
+function rangeCutoff(range: RangeKey): string | null {
+  const now = new Date();
+  if (range === 'all') return null;
+  if (range === 'ytd') return `${now.getFullYear()}-01`;
+  const years = range === '1y' ? 1 : range === '2y' ? 2 : 3;
+  const d = new Date(now.getFullYear() - years, now.getMonth(), 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function RangeToggle({ value, onChange }: { value: RangeKey; onChange: (r: RangeKey) => void }) {
+  return (
+    <div className="flex rounded-full bg-secondary p-0.5 gap-0.5 border border-border shrink-0">
+      {RANGE_LABELS.map(r => (
+        <button
+          key={r.key}
+          type="button"
+          onClick={() => onChange(r.key)}
+          className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-colors ${
+            value === r.key ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          {r.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function useRangeFilter<T extends { monthKey: string }>(rows: T[], range: RangeKey): T[] {
+  const cutoff = rangeCutoff(range);
+  return cutoff ? rows.filter(r => r.monthKey >= cutoff) : rows;
 }
 
 interface CategoryInsight {
