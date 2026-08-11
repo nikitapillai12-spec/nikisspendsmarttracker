@@ -120,10 +120,21 @@ function generateSuggestions(insight: MonthInsight, prevInsight: MonthInsight | 
 }
 
 export function MonthlyOverview({ data }: MonthlyOverviewProps) {
-  const months = useMemo(() => getMonthsInRange(data.entries), [data.entries]);
+  const months = useMemo(
+    () => getMonthsInRange([
+      ...data.entries,
+      ...(data.investmentEntries || []).map(e => ({ date: e.date })),
+    ]),
+    [data.entries, data.investmentEntries],
+  );
   const customCats = data.customCategories || [];
   const allCats = getAllCategories(customCats);
   const [drillMonth, setDrillMonth] = useState<string | null>(null);
+  const [rangeTotal, setRangeTotal] = useState<RangeKey>('all');
+  const [rangeCategory, setRangeCategory] = useState<RangeKey>('all');
+  const [rangeBreakdown, setRangeBreakdown] = useState<RangeKey>('all');
+  const [rangeBudget, setRangeBudget] = useState<RangeKey>('all');
+  const [rangeInvest, setRangeInvest] = useState<RangeKey>('all');
 
   const monthlyData: MonthInsight[] = useMemo(() => {
     return months.map((month, idx) => {
@@ -138,16 +149,18 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
 
       const totalSpend = spendOnly.reduce((s, e) => s + e.amount, 0);
       const totalCredits = creditOnly.reduce((s, e) => s + e.amount, 0);
-      const totalInvestments = investOnly.reduce((s, e) => s + e.amount, 0);
+      const totalInvestments =
+        investOnly.reduce((s, e) => s + e.amount, 0) +
+        (data.investmentEntries || []).filter(e => e.date.startsWith(month)).reduce((s, e) => s + e.amount, 0);
       const netSpend = totalSpend - totalCredits;
       const total = entries.reduce((s, e) => s + signedAmount(e), 0);
-      const budget = getEffectiveMonthlyBudget(data, month);
+      const budget = getPlanMonthlyTotal(data, month) ?? getEffectiveMonthlyBudget(data, month);
       const displayMonth = format(new Date(month + '-01'), 'MMM yy');
 
       const categoryInsights: CategoryInsight[] = allCats
         .map(cat => {
           const spent = byCategory[cat] || 0;
-          const catBudget = getEffectiveCategoryBudget(data, cat, month);
+          const catBudget = getPlanCategoryBudget(data, cat, month) ?? getEffectiveCategoryBudget(data, cat, month);
           return { category: cat, spent, budget: catBudget, diff: catBudget !== null ? catBudget - spent : null };
         })
         .filter(ci => ci.spent > 0 || ci.budget !== null);
@@ -185,10 +198,33 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
       displayMonth: d.displayMonth,
       monthKey: d.month,
       netSpend: d.netSpend,
+      totalSpend: d.totalSpend,
       total: d.total,
       ...d.byCategory,
     }));
   }, [monthlyData]);
+
+  // Chart 0 — total spend per month (spend minus credits), no breakdown
+  const totalSpendData = useMemo(
+    () => monthlyData.map(d => ({
+      month: d.displayMonth,
+      monthKey: d.month,
+      netSpend: d.netSpend,
+      totalSpend: d.totalSpend,
+      totalCredits: d.totalCredits,
+    })),
+    [monthlyData],
+  );
+
+  // Investments per month (entries tagged as investment + investment top-ups)
+  const investmentData = useMemo(
+    () => monthlyData.map(d => ({
+      month: d.displayMonth,
+      monthKey: d.month,
+      invested: d.totalInvestments,
+    })),
+    [monthlyData],
+  );
 
   // Four-bar chart data (Item 4 Chart 2)
   const fourBarData = useMemo(() => {
@@ -206,10 +242,10 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
     return monthlyData.filter(d => d.budget !== null).map(d => ({
       month: d.displayMonth,
       monthKey: d.month,
-      spent: d.total,
+      spent: d.netSpend,
       budget: d.budget as number,
-      diff: d.diff as number,
-      isOver: (d.diff as number) < 0,
+      diff: (d.budget as number) - d.netSpend,
+      isOver: (d.budget as number) - d.netSpend < 0,
     }));
   }, [monthlyData]);
 
