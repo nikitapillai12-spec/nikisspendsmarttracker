@@ -5,6 +5,7 @@ import { DayBox } from './DayBox';
 import { CategoryManager } from './CategoryManager';
 import { RecurringPaymentsManager } from './RecurringPaymentsManager';
 import { InvestmentsManager } from './InvestmentsManager';
+import { BudgetRings } from './BudgetRings';
 import { BudgetData, Category, SpendEntry, EntryType, RecurringPayment, getAllCategories, getCategoryEmoji, getCategoryColor, getRecurringForMonth, signedAmount, shouldDistributeWeekly } from '@/lib/budget-types';
 import { getWeekStart, getWeekEnd, getWeekDays, formatDate, formatMonth, formatDisplayMonth, navigateWeek, getWeeklyBudget, weeksTouchingMonth, recurringDisplayDateInWeek, getWeekRepresentativeDatesForMonth } from '@/lib/date-utils';
 import { addEntry, updateEntry, deleteEntry, getMonthlyBudget, setMonthlyBudget, setCategoryBudget, deleteCategoryBudget, getEffectiveCategoryBudget, setAnnualBudget, getAnnualBudget } from '@/lib/budget-store';
@@ -351,6 +352,8 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
       </div>{/* end Row 2 */}
 
       {/* Weekly Summary Stats (Item 3) */}
+      <BudgetRings data={data} weekStart={formatDate(weekStart)} weekEnd={formatDate(weekEnd)} />
+
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="rounded-xl border border-border bg-budget-over/10 px-4 py-3 text-center">
           <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Total Spend</div>
