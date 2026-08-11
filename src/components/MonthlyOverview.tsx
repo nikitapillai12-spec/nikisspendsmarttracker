@@ -411,15 +411,49 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
         </motion.div>
       )}
 
-      {/* CHART 1 — Monthly Net Spend Stacked Bar by Category */}
+      {/* CHART 0 — Total Spend per Month (spend minus credits) */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+        className="bg-card rounded-2xl border border-border p-6 mcm-shadow">
+        <div className="flex items-start justify-between gap-3 flex-wrap mb-4">
+          <div>
+            <h3 className="font-display font-bold text-lg mb-1">Total Spend per Month</h3>
+            <p className="text-sm text-muted-foreground">Total spend in the month, less all credits received that month.</p>
+          </div>
+          <RangeToggle value={rangeTotal} onChange={setRangeTotal} />
+        </div>
+        <div className="overflow-x-auto -mx-2"><div className="h-72" style={{ minWidth: 320 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={totalSpendRows} barCategoryGap="20%">
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <XAxis dataKey="month" tick={{ fontSize: 13 }} />
+              <YAxis tick={{ fontSize: 13 }} tickFormatter={(v) => `£${v}`} />
+              <Tooltip
+                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', fontSize: '13px' }}
+                formatter={(v: number) => [`£${v.toFixed(2)}`, 'Total spend']}
+              />
+              <Bar dataKey="netSpend" name="Total spend" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} maxBarSize={90}>
+                <LabelList dataKey="netSpend" position="top" formatter={(v: number) => `£${v.toFixed(0)}`}
+                  style={{ fontSize: '11px', fontWeight: 700, fill: 'hsl(var(--foreground))' }} />
+              </Bar>
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div></div>
+      </motion.div>
+
+      {/* CHART 1 — Monthly Spend by Category */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
         className="bg-card rounded-2xl border border-border p-6 mcm-shadow">
-        <h3 className="font-display font-bold text-lg mb-1">Monthly Net Spend by Category</h3>
-        <p className="text-sm text-muted-foreground mb-4">Stacked by category. Hover for breakdown + suggestions.</p>
-        {stackedData.length > 0 && (
+        <div className="flex items-start justify-between gap-3 flex-wrap mb-4">
+          <div>
+            <h3 className="font-display font-bold text-lg mb-1">Monthly Spend by Category</h3>
+            <p className="text-sm text-muted-foreground">Sum of spend per category each month. Hover for breakdown + suggestions.</p>
+          </div>
+          <RangeToggle value={rangeCategory} onChange={setRangeCategory} />
+        </div>
+        {stackedRows.length > 0 && (
           <div className="overflow-x-auto -mx-2"><div className="h-80" style={{minWidth:320}}>
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={stackedData} barCategoryGap="20%">
+              <ComposedChart data={stackedRows} barCategoryGap="20%">
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis dataKey="displayMonth" tick={{ fontSize: 13 }} />
                 <YAxis tick={{ fontSize: 13 }} tickFormatter={(v) => `£${v}`} />
@@ -430,7 +464,7 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
                     radius={cat === activeCategories[activeCategories.length - 1] ? [4, 4, 0, 0] : [0, 0, 0, 0]}>
                     {cat === activeCategories[activeCategories.length - 1] && (
                       <LabelList
-                        dataKey="netSpend"
+                        dataKey="totalSpend"
                         position="top"
                         formatter={(v: number) => `£${v.toFixed(0)}`}
                         style={{ fontSize: '11px', fontWeight: 700, fill: 'hsl(var(--foreground))' }}
@@ -438,8 +472,8 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
                     )}
                   </Bar>
                 ))}
-                <Line type="monotone" dataKey="netSpend" stroke="hsl(var(--foreground))" strokeWidth={2.5}
-                  dot={{ r: 5, fill: 'hsl(var(--foreground))' }} name="Net Spend trend" />
+                <Line type="monotone" dataKey="totalSpend" stroke="hsl(var(--foreground))" strokeWidth={2.5}
+                  dot={{ r: 5, fill: 'hsl(var(--foreground))' }} name="Spend trend" />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
