@@ -699,7 +699,7 @@ function VacationsChart({ data }: { data: BudgetData }) {
       className="bg-card rounded-2xl border border-border p-6 mcm-shadow">
       <div className="flex items-start justify-between mb-1 flex-wrap gap-2">
         <div>
-          <h3 className="font-display font-bold text-lg">✈️ Vacations Budget {thisYear}</h3>
+          <h3 className="font-display font-bold text-lg">✈️ Vacations Budget</h3>
           <p className="text-sm text-muted-foreground">Flights + Travel Spend vs annual budget. Cumulative YTD.</p>
         </div>
         <div className={`text-right rounded-xl px-4 py-2 border ${isOver ? 'bg-budget-over/10 border-budget-over/30' : 'bg-budget-under/10 border-budget-under/30'}`}>
