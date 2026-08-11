@@ -80,8 +80,6 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
     return { spend: spend + recurringSoFar, credits, net: spend + recurringSoFar - credits, recurringSoFar };
   }, [data.entries, data.recurringPayments, month, weekEnd]);
 
-  const weekSpendInclRecurring = weekTotalSpend + recurringWeekTotal;
-
   const weekEntries = useMemo(() => {
     const start = formatDate(weekStart);
     const end = formatDate(weekEnd);
