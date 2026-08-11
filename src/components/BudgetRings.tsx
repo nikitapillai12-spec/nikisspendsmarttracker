@@ -1,6 +1,5 @@
 import { BudgetData, WEEKLY_RING_CATEGORIES, getCategoryEmoji } from '@/lib/budget-types';
 import { getPlanCategoryBudget } from '@/lib/budget-store';
-import { getWeeklyBudget } from '@/lib/date-utils';
 
 interface Props {
   data: BudgetData;
@@ -67,10 +66,9 @@ export function BudgetRings({ data, weekStart, weekEnd }: Props) {
   const month = weekStart.slice(0, 7);
 
   const rings = WEEKLY_RING_CATEGORIES.map(cat => {
-    const monthly = getPlanCategoryBudget(data, cat, month);
-    const budget = monthly === null ? null : getWeeklyBudget(monthly);
+    const budget = getPlanCategoryBudget(data, cat, month);
     const spent = data.entries
-      .filter(e => (e.type ?? 'spend') === 'spend' && e.category === cat && e.date >= weekStart && e.date <= weekEnd)
+      .filter(e => (e.type ?? 'spend') === 'spend' && e.category === cat && e.date.slice(0, 7) === month)
       .reduce((s, e) => s + e.amount, 0);
     return { cat, budget, spent };
   });
@@ -81,7 +79,7 @@ export function BudgetRings({ data, weekStart, weekEnd }: Props) {
     return (
       <div className="rounded-xl border border-dashed border-border bg-secondary/40 px-4 py-3 text-sm text-muted-foreground">
         No locked budget yet — set your monthly category budgets on the <strong>Set Up</strong> tab to see your
-        weekly progress rings here.
+        monthly progress rings here.
       </div>
     );
   }
@@ -89,7 +87,7 @@ export function BudgetRings({ data, weekStart, weekEnd }: Props) {
   return (
     <div>
       <div className="text-[11px] uppercase tracking-widest text-muted-foreground mb-2">
-        This week vs budget
+        This month so far vs budget
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
         {rings.map(r => (
