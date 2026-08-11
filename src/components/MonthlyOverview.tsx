@@ -586,18 +586,23 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
       {budgetChartData.length > 0 && (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
           className="bg-card rounded-2xl border border-border p-6 mcm-shadow">
-          <h3 className="font-display font-bold text-lg mb-1">Actual Spend vs Monthly Budget</h3>
-          <p className="text-sm text-muted-foreground mb-4">Bars show actual spend, dashed line = budget, solid line = trend. Hover for insights + suggestions.</p>
+          <div className="flex items-start justify-between gap-3 flex-wrap mb-4">
+            <div>
+              <h3 className="font-display font-bold text-lg mb-1">Actual Spend vs Monthly Budget</h3>
+              <p className="text-sm text-muted-foreground">Bars show actual spend against your locked-in monthly budget (dashed line).</p>
+            </div>
+            <RangeToggle value={rangeBudget} onChange={setRangeBudget} />
+          </div>
           <div className="overflow-x-auto -mx-2"><div className="h-80" style={{minWidth:320}}>
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={budgetChartData}>
+              <ComposedChart data={budgetRows}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis dataKey="month" tick={{ fontSize: 13 }} />
                 <YAxis tick={{ fontSize: 13 }} tickFormatter={(v) => `£${v}`} />
                 <Tooltip content={<BudgetTooltip />} cursor={{ fill: 'hsl(var(--accent) / 0.08)' }} />
                 <Legend wrapperStyle={{ fontSize: '13px' }} />
                 <Bar dataKey="spent" name="Actual spend" radius={[6, 6, 0, 0]}>
-                  {budgetChartData.map((entry, index) => (
+                  {budgetRows.map((entry, index) => (
                     <Cell key={index} fill={entry.isOver ? 'hsl(var(--budget-over))' : 'hsl(var(--budget-under))'} />
                   ))}
                 </Bar>
@@ -607,42 +612,43 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
             </ResponsiveContainer>
           </div>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
-            {budgetChartData.map((d, i) => (
-              <motion.div key={d.month} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.05 }}
-                className={`rounded-xl p-3 text-center font-display border border-border mcm-shadow-sm ${d.isOver ? 'bg-budget-over/15 text-budget-over' : 'bg-budget-under/15 text-budget-under'}`}>
-                <p className="text-xs opacity-75">{d.month}</p>
-                <p className="font-bold text-lg">{d.isOver ? '🔴' : '🟢'} £{Math.abs(d.diff).toFixed(2)}</p>
-                <p className="text-xs">{d.isOver ? 'over' : 'under'}</p>
-              </motion.div>
-            ))}
-          </div>
-        </motion.div>
-      )}
-
-      {/* Cumulative Savings Chart */}
-      {cumulativeData.length > 1 && (
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
-          className="bg-card rounded-2xl border border-border p-6 mcm-shadow">
-          <h3 className="font-display font-bold text-lg mb-1">Cumulative Savings Trend</h3>
-          <p className="text-sm text-muted-foreground mb-4">Running total of savings vs overspend over time</p>
-          <div className="overflow-x-auto -mx-2"><div className="h-64" style={{minWidth:320}}>
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={cumulativeData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="month" tick={{ fontSize: 13 }} />
-                <YAxis tick={{ fontSize: 13 }} tickFormatter={(v) => `£${v}`} />
-                <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', fontSize: '13px' }} formatter={(value: number) => [`£${value.toFixed(2)}`, 'Net Savings']} />
-                <Area type="monotone" dataKey="cumulative" fill="hsl(var(--accent) / 0.2)" stroke="hsl(var(--accent))" strokeWidth={3} dot={{ r: 6, fill: 'hsl(var(--accent))' }} name="Cumulative" />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
-          </div>
         </motion.div>
       )}
 
       {/* Vacations Budget Chart */}
       <VacationsChart data={data} />
+
+      {/* Personal Investments per Month */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
+        className="bg-card rounded-2xl border border-border p-6 mcm-shadow">
+        <div className="flex items-start justify-between gap-3 flex-wrap mb-4">
+          <div>
+            <h3 className="font-display font-bold text-lg mb-1">📊 Personal Investments per Month</h3>
+            <p className="text-sm text-muted-foreground">Everything you put into investments each month, with a cumulative trend.</p>
+          </div>
+          <RangeToggle value={rangeInvest} onChange={setRangeInvest} />
+        </div>
+        <div className="overflow-x-auto -mx-2"><div className="h-72" style={{ minWidth: 320 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={(() => { let run = 0; return investmentRows.map(r => { run += r.invested; return { ...r, cumulative: run }; }); })()}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <XAxis dataKey="month" tick={{ fontSize: 13 }} />
+              <YAxis tick={{ fontSize: 13 }} tickFormatter={(v) => `£${v}`} />
+              <Tooltip
+                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', fontSize: '13px' }}
+                formatter={(v: number, n: string) => [`£${v.toFixed(2)}`, n]}
+              />
+              <Legend wrapperStyle={{ fontSize: '13px' }} />
+              <Bar dataKey="invested" name="Invested this month" fill="hsl(210, 60%, 45%)" radius={[6, 6, 0, 0]} maxBarSize={80}>
+                <LabelList dataKey="invested" position="top" formatter={(v: number) => v > 0 ? `£${v.toFixed(0)}` : ''}
+                  style={{ fontSize: '11px', fontWeight: 700, fill: 'hsl(var(--foreground))' }} />
+              </Bar>
+              <Line type="monotone" dataKey="cumulative" name="Cumulative invested" stroke="hsl(210, 70%, 30%)"
+                strokeWidth={2.5} dot={{ r: 4 }} />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div></div>
+      </motion.div>
     </div>
   );
 }
