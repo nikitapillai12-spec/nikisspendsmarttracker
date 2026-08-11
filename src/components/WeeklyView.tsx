@@ -82,9 +82,6 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
   // Weekly summary stats (Item 3)
   const weekTotalSpend = weekEntries.filter(e => (e.type ?? 'spend') === 'spend').reduce((s, e) => s + e.amount, 0);
   const weekTotalCredits = weekEntries.filter(e => e.type === 'credit').reduce((s, e) => s + e.amount, 0);
-  const weekTotalInvestments = weekEntries.filter(e => e.type === 'investment').reduce((s, e) => s + e.amount, 0);
-  const weekTotal = weekEntries.reduce((s, e) => s + signedAmount(e), 0);
-  const budgetDiff = weeklyBudget ? weeklyBudget - weekTotal : null;
   const weekSpendInclRecurring = weekTotalSpend + recurringWeekTotal;
   const weekNetSpend = weekSpendInclRecurring - weekTotalCredits;
 
