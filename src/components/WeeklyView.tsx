@@ -60,6 +60,28 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
 
   const recurringWeekTotal = recurringSplits.reduce((s, x) => s + x.perWeek, 0);
 
+  // Month-to-date totals (up to and including the end of the displayed week)
+  const mtd = useMemo(() => {
+    const monthKey = month;
+    const monthStart = `${monthKey}-01`;
+    const cutoff = formatDate(weekEnd);
+    const inMonth = data.entries.filter(e => e.date >= monthStart && e.date <= cutoff && e.date.slice(0, 7) === monthKey);
+    const spend = inMonth.filter(e => (e.type ?? 'spend') === 'spend').reduce((s, e) => s + e.amount, 0);
+    const credits = inMonth.filter(e => e.type === 'credit').reduce((s, e) => s + e.amount, 0);
+
+    // Recurring payments accrued so far this month (per-week split × weeks elapsed)
+    const weeksInMonth = Math.max(1, weeksTouchingMonth(monthKey));
+    const weekDates = getWeekRepresentativeDatesForMonth(monthKey);
+    const weeksElapsed = weekDates.filter(d => d <= cutoff).length;
+    const monthlyRecurring = getRecurringForMonth(data.recurringPayments, monthKey)
+      .reduce((s, p) => s + p.amount, 0);
+    const recurringSoFar = (monthlyRecurring / weeksInMonth) * weeksElapsed;
+
+    return { spend: spend + recurringSoFar, credits, net: spend + recurringSoFar - credits, recurringSoFar };
+  }, [data.entries, data.recurringPayments, month, weekEnd]);
+
+  const weekSpendInclRecurring = weekTotalSpend + recurringWeekTotal;
+
   const weekEntries = useMemo(() => {
     const start = formatDate(weekStart);
     const end = formatDate(weekEnd);
@@ -356,18 +378,28 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="rounded-xl border border-border bg-budget-over/10 px-4 py-3 text-center">
-          <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Total Spend</div>
-          <div className="font-display text-xl text-budget-over">£{weekTotalSpend.toFixed(2)}</div>
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Week Total Spend</div>
+          <div className="font-display text-xl text-budget-over">£{weekSpendInclRecurring.toFixed(2)}</div>
+          <div className="text-[10px] text-muted-foreground mt-0.5">incl. £{recurringWeekTotal.toFixed(2)} monthly split</div>
+        </div>
+        <div className="rounded-xl border border-border bg-budget-over/5 px-4 py-3 text-center">
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">MTD Total Spend</div>
+          <div className="font-display text-xl text-budget-over">£{mtd.spend.toFixed(2)}</div>
+          <div className="text-[10px] text-muted-foreground mt-0.5">incl. £{mtd.recurringSoFar.toFixed(2)} monthly split</div>
         </div>
         <div className="rounded-xl border border-border bg-budget-under/10 px-4 py-3 text-center">
           <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Total Credits</div>
           <div className="font-display text-xl text-budget-under">£{weekTotalCredits.toFixed(2)}</div>
         </div>
         <div className={`rounded-xl border border-border px-4 py-3 text-center ${weekNetSpend >= 0 ? 'bg-secondary' : 'bg-budget-under/10'}`}>
-          <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Net Spend</div>
-          <div className={`font-display text-xl ${weekNetSpend < 0 ? 'text-budget-under' : 'text-foreground'}`}>
-            {weekNetSpend < 0 ? '-' : ''}£{Math.abs(weekNetSpend).toFixed(2)}
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Week Net Spend</div>
+          <div className={`font-display text-xl ${(weekNetSpend + recurringWeekTotal) < 0 ? 'text-budget-under' : 'text-foreground'}`}>
+            {(weekNetSpend + recurringWeekTotal) < 0 ? '-' : ''}£{Math.abs(weekNetSpend + recurringWeekTotal).toFixed(2)}
           </div>
+        </div>
+        <div className="rounded-xl border border-border bg-secondary px-4 py-3 text-center">
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">MTD Net Spend</div>
+          <div className="font-display text-xl">£{mtd.net.toFixed(2)}</div>
         </div>
         <div className="rounded-xl border border-border bg-blue-50 px-4 py-3 text-center">
           <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Investments</div>
