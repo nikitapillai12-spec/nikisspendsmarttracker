@@ -412,6 +412,7 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
                 customCategories={data.customCategories}
                 allEntries={data.entries}
                 recurringSplits={dayRecurring}
+                investmentPlatforms={data.investmentPlatforms}
                 onAdd={(amount, category, note, type) => handleAdd(dateStr, amount, category, note, type)}
                 onUpdate={handleUpdate}
                 onDelete={handleDelete}
