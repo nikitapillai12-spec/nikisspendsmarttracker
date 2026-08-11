@@ -866,7 +866,10 @@ export function deleteRecurringInvestment(id: string): BudgetData {
 export function updateRecurringInvestment(id: string, updates: Partial<Omit<RecurringInvestment, 'id'>>): BudgetData {
   cache.recurringInvestments = (cache.recurringInvestments || []).map(r => r.id === id ? { ...r, ...updates } : r);
   notify();
-  const patch: Record<string, unknown> = {};
+  const patch: {
+    amount?: number; platform?: string; start_date?: string; end_date?: string | null;
+    frequency?: string; day_of_week?: number | null; note?: string | null; active?: boolean;
+  } = {};
   if (updates.amount !== undefined) patch.amount = updates.amount;
   if (updates.platform !== undefined) patch.platform = updates.platform;
   if (updates.startDate !== undefined) patch.start_date = updates.startDate;
