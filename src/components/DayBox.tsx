@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RetailerInput } from './RetailerInput';
-import { linkRefundPair, unlinkRefundPair } from '@/lib/budget-store';
+import { linkRefundPair, unlinkRefundPair, addRecurringInvestment } from '@/lib/budget-store';
 import { findRefundPairs } from './RefundMatcher';
 
 interface DayBoxProps {
@@ -18,6 +18,7 @@ interface DayBoxProps {
   customCategories: CustomCategory[];
   allEntries: SpendEntry[];
   recurringSplits?: { payment: RecurringPayment; perWeek: number }[];
+  investmentPlatforms?: string[];
   onAdd: (amount: number, category: Category, note?: string, type?: EntryType) => void;
   onUpdate: (id: string, amount: number, category: Category, note?: string, type?: EntryType) => void;
   onDelete: (id: string) => void;
@@ -31,7 +32,7 @@ interface RefundSuggestion {
   creditEntry: SpendEntry;
 }
 
-export function DayBox({ date, dateStr, entries, customCategories, allEntries, recurringSplits, onAdd, onUpdate, onDelete, onDataChange }: DayBoxProps) {
+export function DayBox({ date, dateStr, entries, customCategories, allEntries, recurringSplits, investmentPlatforms = [], onAdd, onUpdate, onDelete, onDataChange }: DayBoxProps) {
   const [addMode, setAddMode] = useState<AddMode>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [amount, setAmount] = useState('');
@@ -39,6 +40,14 @@ export function DayBox({ date, dateStr, entries, customCategories, allEntries, r
   const [category, setCategory] = useState<Category>('Groceries');
   const [note, setNote] = useState('');
   const [refundSuggestion, setRefundSuggestion] = useState<RefundSuggestion | null>(null);
+
+  // Recurring investment options (shown when adding an Investment)
+  const [isRecurringInvestment, setIsRecurringInvestment] = useState(false);
+  const [riStart, setRiStart] = useState(dateStr);
+  const [riEnd, setRiEnd] = useState('');
+  const [riFreq, setRiFreq] = useState<'weekly' | 'fortnightly' | 'monthly'>('monthly');
+  const [riDow, setRiDow] = useState<number>(new Date(dateStr).getDay());
+  const [riPlatform, setRiPlatform] = useState<string>(investmentPlatforms[0] || 'T212 ISA');
 
   const total = entries.reduce((s, e) => s + signedAmount(e), 0);
   const today = isToday(date);
@@ -114,6 +123,25 @@ export function DayBox({ date, dateStr, entries, customCategories, allEntries, r
     const val = parseFloat(amount);
     if (val <= 0 || !amount) return;
 
+    if (addMode === 'investment' && isRecurringInvestment) {
+      onDataChange(addRecurringInvestment({
+        id: crypto.randomUUID(),
+        amount: val,
+        platform: riPlatform,
+        startDate: riStart || dateStr,
+        endDate: riEnd || undefined,
+        frequency: riFreq,
+        dayOfWeek: riFreq === 'monthly' ? undefined : riDow,
+        note: note.trim() || undefined,
+        active: true,
+      }));
+      setAmount('');
+      setNote('');
+      setIsRecurringInvestment(false);
+      setAddMode(null);
+      return;
+    }
+
     const cat = entryType === 'investment' ? 'Investment' : category;
     const actualType: EntryType = entryType;
 
@@ -162,6 +190,11 @@ export function DayBox({ date, dateStr, entries, customCategories, allEntries, r
   const openAdd = (mode: 'spend' | 'credit' | 'investment') => {
     setAddMode(mode);
     setEditingId(null);
+    setIsRecurringInvestment(false);
+    setRiStart(dateStr);
+    setRiEnd('');
+    setRiPlatform(investmentPlatforms[0] || 'T212 ISA');
+    setRiDow(new Date(dateStr).getDay());
     setEntryType(mode === 'investment' ? 'investment' : mode);
     const cats = getAllCategories(customCategories, mode === 'investment' ? 'investment' : mode);
     setCategory(cats[0] ?? 'Groceries');
