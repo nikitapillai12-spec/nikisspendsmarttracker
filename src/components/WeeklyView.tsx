@@ -60,6 +60,7 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
     const inMonth = data.entries.filter(e => e.date >= monthStart && e.date <= cutoff && e.date.slice(0, 7) === monthKey);
     const spend = inMonth.filter(e => (e.type ?? 'spend') === 'spend').reduce((s, e) => s + e.amount, 0);
     const credits = inMonth.filter(e => e.type === 'credit').reduce((s, e) => s + e.amount, 0);
+    const investments = inMonth.filter(e => e.type === 'investment').reduce((s, e) => s + e.amount, 0);
 
     // Recurring payments accrued so far this month (per-week split × weeks elapsed)
     const weeksInMonth = Math.max(1, weeksTouchingMonth(monthKey));
@@ -69,7 +70,7 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
       .reduce((s, p) => s + p.amount, 0);
     const recurringSoFar = (monthlyRecurring / weeksInMonth) * weeksElapsed;
 
-    return { spend: spend + recurringSoFar, credits, net: spend + recurringSoFar - credits, recurringSoFar };
+    return { spend: spend + recurringSoFar, credits, investments, net: spend + recurringSoFar - credits, recurringSoFar };
   }, [data.entries, data.recurringPayments, month, weekEnd]);
 
   const weekEntries = useMemo(() => {
@@ -82,10 +83,10 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
   const weekTotalSpend = weekEntries.filter(e => (e.type ?? 'spend') === 'spend').reduce((s, e) => s + e.amount, 0);
   const weekTotalCredits = weekEntries.filter(e => e.type === 'credit').reduce((s, e) => s + e.amount, 0);
   const weekTotalInvestments = weekEntries.filter(e => e.type === 'investment').reduce((s, e) => s + e.amount, 0);
-  const weekNetSpend = weekTotalSpend - weekTotalCredits;
   const weekTotal = weekEntries.reduce((s, e) => s + signedAmount(e), 0);
   const budgetDiff = weeklyBudget ? weeklyBudget - weekTotal : null;
   const weekSpendInclRecurring = weekTotalSpend + recurringWeekTotal;
+  const weekNetSpend = weekSpendInclRecurring - weekTotalCredits;
 
   const handleAdd = useCallback((dateStr: string, amount: number, category: Category, note?: string, type?: EntryType) => {
     const effectiveType = type ?? 'spend';
@@ -158,43 +159,10 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
 
         {/* Row 2: totals + action buttons */}
         <div className="flex items-center gap-2 flex-wrap">
-          <motion.div
-            key={weekTotal}
-            initial={{ scale: 0.9 }}
-            animate={{ scale: 1 }}
-            className="px-3 py-1.5 rounded-lg bg-secondary border border-border mcm-shadow-sm"
-          >
-            <span className="text-[10px] text-muted-foreground uppercase tracking-widest">Week Total</span>
-            <p className="font-display font-normal text-xl sm:text-2xl tracking-wide leading-none mt-0.5">£{weekTotal.toFixed(2)}</p>
-          </motion.div>
-
-          {weeklyBudget !== null && budgetDiff !== null && (
-            <motion.div
-              key={budgetDiff}
-              initial={{ scale: 0.9 }}
-              animate={{ scale: 1 }}
-              className={`px-3 py-1.5 rounded-lg border border-border mcm-shadow-sm ${
-                budgetDiff >= 0
-                  ? 'bg-budget-under/10 text-budget-under'
-                  : 'bg-budget-over/10 text-budget-over'
-              }`}
-            >
-              <span className="text-[10px] opacity-75 uppercase tracking-widest">
-                £{weeklyBudget.toFixed(0)}/wk
-              </span>
-              <p className="font-display font-normal text-xl sm:text-2xl tracking-wide leading-none mt-0.5">
-                {budgetDiff >= 0 ? '✅' : '🔴'} £{Math.abs(budgetDiff).toFixed(2)} {budgetDiff >= 0 ? 'under' : 'over'}
-              </p>
-            </motion.div>
-          )}
-
           <RecurringPaymentsManager data={data} onDataChange={onDataChange} />
           <CategoryManager data={data} onDataChange={onDataChange} />
         </div>
       </div>{/* end Row 2 */}
-
-      {/* Weekly Summary Stats (Item 3) */}
-      <BudgetRings data={data} weekStart={formatDate(weekStart)} weekEnd={formatDate(weekEnd)} />
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="rounded-xl border border-border bg-budget-over/10 px-4 py-3 text-center">
@@ -207,25 +175,29 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
           <div className="font-display text-xl text-budget-over">£{mtd.spend.toFixed(2)}</div>
           <div className="text-[10px] text-muted-foreground mt-0.5">incl. £{mtd.recurringSoFar.toFixed(2)} monthly split</div>
         </div>
-        <div className="rounded-xl border border-border bg-budget-under/10 px-4 py-3 text-center">
-          <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Total Credits</div>
-          <div className="font-display text-xl text-budget-under">£{weekTotalCredits.toFixed(2)}</div>
-        </div>
         <div className={`rounded-xl border border-border px-4 py-3 text-center ${weekNetSpend >= 0 ? 'bg-secondary' : 'bg-budget-under/10'}`}>
           <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Week Net Spend</div>
-          <div className={`font-display text-xl ${(weekNetSpend + recurringWeekTotal) < 0 ? 'text-budget-under' : 'text-foreground'}`}>
-            {(weekNetSpend + recurringWeekTotal) < 0 ? '-' : ''}£{Math.abs(weekNetSpend + recurringWeekTotal).toFixed(2)}
+          <div className={`font-display text-xl ${weekNetSpend < 0 ? 'text-budget-under' : 'text-foreground'}`}>
+            {weekNetSpend < 0 ? '-' : ''}£{Math.abs(weekNetSpend).toFixed(2)}
           </div>
         </div>
         <div className="rounded-xl border border-border bg-secondary px-4 py-3 text-center">
           <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">MTD Net Spend</div>
-          <div className="font-display text-xl">£{mtd.net.toFixed(2)}</div>
+          <div className={`font-display text-xl ${mtd.net < 0 ? 'text-budget-under' : ''}`}>
+            {mtd.net < 0 ? '-' : ''}£{Math.abs(mtd.net).toFixed(2)}
+          </div>
+        </div>
+        <div className="rounded-xl border border-border bg-budget-under/10 px-4 py-3 text-center">
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Total Credits</div>
+          <div className="font-display text-xl text-budget-under">£{weekTotalCredits.toFixed(2)}</div>
         </div>
         <div className="rounded-xl border border-border bg-blue-50 px-4 py-3 text-center">
-          <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Investments</div>
-          <div className="font-display text-xl text-blue-600">£{weekTotalInvestments.toFixed(2)}</div>
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">MTD Investments</div>
+          <div className="font-display text-xl text-blue-600">£{mtd.investments.toFixed(2)}</div>
         </div>
       </div>
+
+      <BudgetRings data={data} weekStart={formatDate(weekStart)} weekEnd={formatDate(weekEnd)} />
 
       {recurringWeekTotal > 0 && (
         <div className="rounded-xl border border-dashed border-border bg-secondary/40 px-4 py-3 text-sm flex flex-wrap items-center gap-x-4 gap-y-1">
