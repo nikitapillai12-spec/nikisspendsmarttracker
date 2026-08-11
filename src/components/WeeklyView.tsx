@@ -93,6 +93,7 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
   const weekNetSpend = weekTotalSpend - weekTotalCredits;
   const weekTotal = weekEntries.reduce((s, e) => s + signedAmount(e), 0);
   const budgetDiff = weeklyBudget ? weeklyBudget - weekTotal : null;
+  const weekSpendInclRecurring = weekTotalSpend + recurringWeekTotal;
 
   const handleAdd = useCallback((dateStr: string, amount: number, category: Category, note?: string, type?: EntryType) => {
     const effectiveType = type ?? 'spend';
