@@ -484,12 +484,17 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
       {/* CHART 2 — Four-Bar Monthly Breakdown with Trendline */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
         className="bg-card rounded-2xl border border-border p-6 mcm-shadow">
-        <h3 className="font-display font-bold text-lg mb-1">Monthly Breakdown — Spend / Credits / Net / Investments</h3>
-        <p className="text-sm text-muted-foreground mb-4">Click any bar or label to drill into that month.</p>
-        {fourBarData.length > 0 && (
+        <div className="flex items-start justify-between gap-3 flex-wrap mb-4">
+          <div>
+            <h3 className="font-display font-bold text-lg mb-1">Monthly Breakdown — Spend / Credits / Net / Investments</h3>
+            <p className="text-sm text-muted-foreground">Click any bar or label to drill into that month.</p>
+          </div>
+          <RangeToggle value={rangeBreakdown} onChange={setRangeBreakdown} />
+        </div>
+        {fourBarRows.length > 0 && (
           <div className="overflow-x-auto -mx-2"><div className="h-80" style={{minWidth:320}}>
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={fourBarData} barCategoryGap="15%">
+              <ComposedChart data={fourBarRows} barCategoryGap="15%">
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis dataKey="month" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `£${v}`} />
