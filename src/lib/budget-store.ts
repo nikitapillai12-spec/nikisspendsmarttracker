@@ -191,6 +191,8 @@ function setupRealtime() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'investment_entries', filter }, scheduleRefetch)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'investment_platforms', filter }, scheduleRefetch)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'annual_budgets', filter }, scheduleRefetch)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'budget_plans', filter }, scheduleRefetch)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'recurring_investments', filter }, scheduleRefetch)
     .subscribe();
 }
 
