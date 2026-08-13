@@ -38,6 +38,8 @@ function mapRecInv(r: any): RecurringInvestment {
     endDate: r.end_date ?? undefined,
     frequency: (r.frequency ?? 'monthly') as RecurringInvestment['frequency'],
     dayOfWeek: r.day_of_week ?? undefined,
+    dayOfMonth: r.day_of_month ?? undefined,
+    locked: !!r.locked,
     note: r.note ?? undefined,
     active: !!r.active,
   };
@@ -861,6 +863,8 @@ export function addRecurringInvestment(r: RecurringInvestment): BudgetData {
     end_date: r.endDate ?? null,
     frequency: r.frequency,
     day_of_week: r.dayOfWeek ?? null,
+    day_of_month: r.dayOfMonth ?? 1,
+    locked: !!r.locked,
     note: r.note ?? null,
     active: r.active,
   }).then(({ error }) => { if (error) console.error('addRecurringInvestment sync', error); });
@@ -880,7 +884,8 @@ export function updateRecurringInvestment(id: string, updates: Partial<Omit<Recu
   notify();
   const patch: {
     amount?: number; platform?: string; start_date?: string; end_date?: string | null;
-    frequency?: string; day_of_week?: number | null; note?: string | null; active?: boolean;
+    frequency?: string; day_of_week?: number | null; day_of_month?: number; locked?: boolean;
+    note?: string | null; active?: boolean;
   } = {};
   if (updates.amount !== undefined) patch.amount = updates.amount;
   if (updates.platform !== undefined) patch.platform = updates.platform;
@@ -888,6 +893,8 @@ export function updateRecurringInvestment(id: string, updates: Partial<Omit<Recu
   if (updates.endDate !== undefined) patch.end_date = updates.endDate ?? null;
   if (updates.frequency !== undefined) patch.frequency = updates.frequency;
   if (updates.dayOfWeek !== undefined) patch.day_of_week = updates.dayOfWeek ?? null;
+  if (updates.dayOfMonth !== undefined) patch.day_of_month = updates.dayOfMonth;
+  if (updates.locked !== undefined) patch.locked = updates.locked;
   if (updates.note !== undefined) patch.note = updates.note ?? null;
   if (updates.active !== undefined) patch.active = updates.active;
   supabase.from('recurring_investments').update(patch).eq('id', id)
