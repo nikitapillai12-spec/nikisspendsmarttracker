@@ -1,0 +1,2 @@
+ALTER TABLE public.recurring_investments ADD COLUMN IF NOT EXISTS day_of_month integer NOT NULL DEFAULT 1;
+ALTER TABLE public.recurring_investments ADD COLUMN IF NOT EXISTS locked boolean NOT NULL DEFAULT false;

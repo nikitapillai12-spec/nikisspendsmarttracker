@@ -272,10 +272,12 @@ export type Database = {
           active: boolean
           amount: number
           created_at: string
+          day_of_month: number
           day_of_week: number | null
           end_date: string | null
           frequency: string
           id: string
+          locked: boolean
           note: string | null
           platform: string
           start_date: string
@@ -286,10 +288,12 @@ export type Database = {
           active?: boolean
           amount: number
           created_at?: string
+          day_of_month?: number
           day_of_week?: number | null
           end_date?: string | null
           frequency?: string
           id?: string
+          locked?: boolean
           note?: string | null
           platform: string
           start_date: string
@@ -300,10 +304,12 @@ export type Database = {
           active?: boolean
           amount?: number
           created_at?: string
+          day_of_month?: number
           day_of_week?: number | null
           end_date?: string | null
           frequency?: string
           id?: string
+          locked?: boolean
           note?: string | null
           platform?: string
           start_date?: string
