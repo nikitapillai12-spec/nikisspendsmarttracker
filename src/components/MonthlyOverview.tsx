@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TrendingUp, TrendingDown, X } from 'lucide-react';
-import { BudgetData, getAllCategories, getCategoryColor, getCategoryEmoji, signedAmount } from '@/lib/budget-types';
+import { BudgetData, getAllCategories, getCategoryColor, getCategoryEmoji, getRecurringInvestmentTotal, signedAmount } from '@/lib/budget-types';
 import { getMonthsInRange } from '@/lib/date-utils';
 import { getEffectiveMonthlyBudget, getEffectiveCategoryBudget, getPlanMonthlyTotal, getPlanCategoryBudget } from '@/lib/budget-store';
 import {
@@ -124,8 +124,11 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
     () => getMonthsInRange([
       ...data.entries,
       ...(data.investmentEntries || []).map(e => ({ date: e.date })),
+      // Include the span covered by recurring investments so future months appear
+      ...(data.recurringInvestments || []).flatMap(r =>
+        r.active ? [{ date: r.startDate }, { date: r.endDate || r.startDate }] : []),
     ]),
-    [data.entries, data.investmentEntries],
+    [data.entries, data.investmentEntries, data.recurringInvestments],
   );
   const customCats = data.customCategories || [];
   const allCats = getAllCategories(customCats);
@@ -151,7 +154,8 @@ export function MonthlyOverview({ data }: MonthlyOverviewProps) {
       const totalCredits = creditOnly.reduce((s, e) => s + e.amount, 0);
       const totalInvestments =
         investOnly.reduce((s, e) => s + e.amount, 0) +
-        (data.investmentEntries || []).filter(e => e.date.startsWith(month)).reduce((s, e) => s + e.amount, 0);
+        (data.investmentEntries || []).filter(e => e.date.startsWith(month)).reduce((s, e) => s + e.amount, 0) +
+        getRecurringInvestmentTotal(data.recurringInvestments, month);
       const netSpend = totalSpend - totalCredits;
       const total = entries.reduce((s, e) => s + signedAmount(e), 0);
       const budget = getPlanMonthlyTotal(data, month) ?? getEffectiveMonthlyBudget(data, month);
