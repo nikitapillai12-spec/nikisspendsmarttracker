@@ -254,7 +254,14 @@ function RecurringInvestmentsSection({ data, onDataChange }: Props) {
               >
                 {r.locked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
               </button>
-              <button onClick={() => startEdit(r)} className="text-muted-foreground hover:text-foreground"><Pencil className="w-4 h-4" /></button>
+              <button
+                onClick={() => !r.locked && startEdit(r)}
+                disabled={r.locked}
+                title={r.locked ? 'Unlock to edit' : 'Edit'}
+                className="text-muted-foreground hover:text-foreground disabled:opacity-40"
+              >
+                <Pencil className="w-4 h-4" />
+              </button>
               <button onClick={() => onDataChange(deleteRecurringInvestment(r.id))} className="text-muted-foreground hover:text-destructive"><Trash2 className="w-4 h-4" /></button>
             </div>
           )}
