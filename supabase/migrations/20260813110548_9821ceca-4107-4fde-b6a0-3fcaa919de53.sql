@@ -1,0 +1,1 @@
+UPDATE public.recurring_investments SET day_of_month = EXTRACT(DAY FROM start_date)::int WHERE day_of_month = 1 AND EXTRACT(DAY FROM start_date)::int <> 1;

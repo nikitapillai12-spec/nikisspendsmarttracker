@@ -5,7 +5,7 @@ import { DayBox } from './DayBox';
 import { CategoryManager } from './CategoryManager';
 import { RecurringPaymentsManager } from './RecurringPaymentsManager';
 import { BudgetRings } from './BudgetRings';
-import { BudgetData, Category, SpendEntry, EntryType, RecurringPayment, getAllCategories, getCategoryEmoji, getCategoryColor, getRecurringForMonth, signedAmount, shouldDistributeWeekly } from '@/lib/budget-types';
+import { BudgetData, Category, SpendEntry, EntryType, RecurringPayment, getAllCategories, getCategoryEmoji, getCategoryColor, getRecurringForMonth, getRecurringInvestmentTotal, signedAmount, shouldDistributeWeekly } from '@/lib/budget-types';
 import { getWeekStart, getWeekEnd, getWeekDays, formatDate, formatMonth, formatDisplayMonth, navigateWeek, getWeeklyBudget, weeksTouchingMonth, recurringDisplayDateInWeek, getWeekRepresentativeDatesForMonth } from '@/lib/date-utils';
 import { addEntry, updateEntry, deleteEntry, getMonthlyBudget } from '@/lib/budget-store';
 import { Button } from '@/components/ui/button';
@@ -60,7 +60,12 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
     const inMonth = data.entries.filter(e => e.date >= monthStart && e.date <= cutoff && e.date.slice(0, 7) === monthKey);
     const spend = inMonth.filter(e => (e.type ?? 'spend') === 'spend').reduce((s, e) => s + e.amount, 0);
     const credits = inMonth.filter(e => e.type === 'credit').reduce((s, e) => s + e.amount, 0);
-    const investments = inMonth.filter(e => e.type === 'investment').reduce((s, e) => s + e.amount, 0);
+    const adhocInvestments = inMonth.filter(e => e.type === 'investment').reduce((s, e) => s + e.amount, 0);
+    const oneOffTopUps = (data.investmentEntries || [])
+      .filter(e => e.date.slice(0, 7) === monthKey && e.date <= cutoff)
+      .reduce((s, e) => s + e.amount, 0);
+    const recurringInvestments = getRecurringInvestmentTotal(data.recurringInvestments, monthKey, cutoff);
+    const investments = adhocInvestments + oneOffTopUps + recurringInvestments;
 
     // Recurring payments accrued so far this month (per-week split × weeks elapsed)
     const weeksInMonth = Math.max(1, weeksTouchingMonth(monthKey));
@@ -70,8 +75,8 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
       .reduce((s, p) => s + p.amount, 0);
     const recurringSoFar = (monthlyRecurring / weeksInMonth) * weeksElapsed;
 
-    return { spend: spend + recurringSoFar, credits, investments, net: spend + recurringSoFar - credits, recurringSoFar };
-  }, [data.entries, data.recurringPayments, month, weekEnd]);
+    return { spend: spend + recurringSoFar, credits, investments, recurringInvestments, net: spend + recurringSoFar - credits, recurringSoFar };
+  }, [data.entries, data.recurringPayments, data.investmentEntries, data.recurringInvestments, month, weekEnd]);
 
   const weekEntries = useMemo(() => {
     const start = formatDate(weekStart);
@@ -191,6 +196,9 @@ export function WeeklyView({ data, onDataChange }: WeeklyViewProps) {
         <div className="rounded-xl border border-border bg-blue-50 px-4 py-3 text-center">
           <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">MTD Investments</div>
           <div className="font-display text-xl text-blue-600">£{mtd.investments.toFixed(2)}</div>
+          {mtd.recurringInvestments > 0 && (
+            <div className="text-[10px] text-muted-foreground mt-0.5">incl. £{mtd.recurringInvestments.toFixed(2)} recurring</div>
+          )}
         </div>
       </div>
 
