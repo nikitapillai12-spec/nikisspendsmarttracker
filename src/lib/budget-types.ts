@@ -146,8 +146,47 @@ export interface RecurringInvestment {
   endDate?: string;
   frequency: InvestmentFrequency;
   dayOfWeek?: number; // 0=Sun … 6=Sat
+  /** Day of the month the monthly investment goes out (1-31, clamped) */
+  dayOfMonth?: number;
+  /** Locked schedules are read-only until unlocked */
+  locked?: boolean;
   note?: string;
   active: boolean;
+}
+
+/**
+ * Expands recurring investments into the concrete occurrence(s) that fall in a
+ * given month (YYYY-MM). Frequency is monthly.
+ */
+export function getRecurringInvestmentOccurrences(
+  list: RecurringInvestment[] | undefined,
+  monthKey: string,
+): Array<{ investment: RecurringInvestment; date: string; amount: number }> {
+  const out: Array<{ investment: RecurringInvestment; date: string; amount: number }> = [];
+  (list || []).forEach(ri => {
+    if (!ri.active) return;
+    if (monthKey < ri.startDate.slice(0, 7)) return;
+    if (ri.endDate && monthKey > ri.endDate.slice(0, 7)) return;
+    const [y, m] = monthKey.split('-').map(Number);
+    const daysInMonth = new Date(y, m, 0).getDate();
+    const day = Math.min(Math.max(ri.dayOfMonth || Number(ri.startDate.slice(8, 10)) || 1, 1), daysInMonth);
+    const date = `${monthKey}-${String(day).padStart(2, '0')}`;
+    if (date < ri.startDate) return;
+    if (ri.endDate && date > ri.endDate) return;
+    out.push({ investment: ri, date, amount: ri.amount });
+  });
+  return out;
+}
+
+/** Total recurring investment amount landing in a month, optionally up to a cutoff date. */
+export function getRecurringInvestmentTotal(
+  list: RecurringInvestment[] | undefined,
+  monthKey: string,
+  cutoffDate?: string,
+): number {
+  return getRecurringInvestmentOccurrences(list, monthKey)
+    .filter(o => !cutoffDate || o.date <= cutoffDate)
+    .reduce((s, o) => s + o.amount, 0);
 }
 
 /** Categories shown as budget progress rings at the top of the weekly view. */
